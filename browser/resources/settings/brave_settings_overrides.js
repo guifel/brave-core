@@ -144,9 +144,12 @@ BravePatching.RegisterPolymerTemplateModifications({
     // Move Appearance item
     const appearanceBrowserEl = getMenuElement(templateContent, '/appearance')
     getStartedEl.insertAdjacentElement('afterend', appearanceBrowserEl)
+    // Add Tab item
+    const tabEl = createMenuElement(loadTimeData.getString('tab'), '/tab', 'brave_settings:sync')
+    appearanceBrowserEl.insertAdjacentElement('afterend', tabEl)
     // Add Sync item
     const syncEl = createMenuElement(loadTimeData.getString('braveSync'), '/braveSync', 'brave_settings:sync')
-    appearanceBrowserEl.insertAdjacentElement('afterend', syncEl)
+    tabEl.insertAdjacentElement('afterend', syncEl)
     // Add Shields item
     const shieldsEl = createMenuElement(loadTimeData.getString('braveShieldsTitle'), '/shields',  'brave_settings:shields')
     syncEl.insertAdjacentElement('afterend', shieldsEl)
@@ -207,6 +210,7 @@ BravePatching.RegisterPolymerTemplateModifications({
     r.SOCIAL_BLOCKING = r.BASIC.createSection('/socialBlocking', 'socialBlocking')
     r.EXTENSIONS = r.BASIC.createSection('/extensions', 'extensions')
     r.BRAVE_SYNC = r.BASIC.createSection('/braveSync', 'braveSync')
+    r.TAB = r.BASIC.createSection('/tab', 'tab')
     if (!r.SITE_SETTINGS) {
       console.error('[Brave Settings Overrides] Routes: could not find SITE_SETTINGS page')
     }
@@ -236,6 +240,16 @@ BravePatching.RegisterPolymerTemplateModifications({
       sectionGetStarted.innerHTML = `
         <settings-section page-title="${loadTimeData.getString('braveGetStartedTitle')}" section="getStarted">
           <brave-settings-getting-started prefs={{prefs}} page-visibility=[[pageVisibility]]></brave-settings-getting-started>
+        </settings-section>
+      `
+      const sectionTab = document.createElement('template')
+      sectionTab.setAttribute('is', 'dom-if')
+      sectionTab.setAttribute('restamp', true)
+      sectionTab.setAttribute('if', '[[showPage_(pageVisibility.tab)]]')
+      sectionTab.innerHTML = `
+        <settings-section page-title="${loadTimeData.getString('tab')}"
+            section="tab">
+          <settings-tab-page prefs="{{prefs}}"></settings-tab-page>
         </settings-section>
       `
       const sectionExtensions = document.createElement('template')
@@ -281,8 +295,10 @@ BravePatching.RegisterPolymerTemplateModifications({
       // Move Appearance item
       const sectionAppearance = getSectionElement(actualTemplate.content, 'appearance')
       sectionGetStarted.insertAdjacentElement('afterend', sectionAppearance)
+      // Insert tab
+      sectionAppearance.insertAdjacentElement('afterend', sectionTab) 
       // Insert sync
-      sectionAppearance.insertAdjacentElement('afterend', sectionSync)
+      sectionTab.insertAdjacentElement('afterend', sectionSync)
       // Insert shields
       sectionSync.insertAdjacentElement('afterend', sectionShields)
       // Insert Social Blocking

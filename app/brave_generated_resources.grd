@@ -241,6 +241,13 @@ By installing this extension, you are agreeing to the Google Widevine Terms of U
       <message name="IDS_SETTINGS_ALWAYS_SHOW_BOOKMARK_BAR_ON_NTP" desc="The label for settings switch controlling the visibility of bookmarks bar on NTP">
         Always show bookmarks on New Tab page
       </message>
+      <!--- Tab settings-->
+      <message name="IDS_SETTINGS_BRAVE_TABS_TITLE" desc="The title for Brave tabs in settings">
+        Tabs
+      </message>
+      <message name="IDS_SETTINGS_BRAVE_MRU_CYCLING_LABEL" desc="The label to activate MRU cycling with Ctrl-tab">
+        Cycle through the most recently used tabs with Ctrl-Tab
+      </message>
       <!-- Tor -->
       <message name="IDS_NEW_TOR_IDENTITY" desc="The text label of a menu item for requesting new Tor identity">
         New Tor Identity
