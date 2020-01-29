@@ -53,6 +53,8 @@ IN_PROC_BROWSER_TEST_F(BraveProfilePrefsBrowserTest, MiscBravePrefs) {
       browser()->profile()->GetPrefs()->GetBoolean(kIPFSCompanionEnabled));
   EXPECT_TRUE(
       browser()->profile()->GetPrefs()->GetBoolean(kBraveWalletEnabled));
+  EXPECT_FALSE(
+      browser()->profile()->GetPrefs()->GetBoolean(kMRUCyclingEnabled));
 
 #if !BUILDFLAG(USE_GCM_FROM_PLATFORM)
   EXPECT_FALSE(
