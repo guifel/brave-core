@@ -64,6 +64,9 @@ const PrefsUtil::TypedPrefMap& BravePrefsUtil::GetWhitelistedKeys() {
       settings_api::PrefType::PREF_TYPE_NUMBER;
   (*s_brave_whitelist)[kAskWidevineInstall] =
       settings_api::PrefType::PREF_TYPE_BOOLEAN;
+  // Tabs prefs
+  (*s_brave_whitelist)[kMRUCyclingEnabled] =
+    settings_api::PrefType::PREF_TYPE_BOOLEAN;
   // Clear browsing data on exit prefs.
   (*s_brave_whitelist)[browsing_data::prefs::kDeleteBrowsingHistoryOnExit] =
     settings_api::PrefType::PREF_TYPE_BOOLEAN;
