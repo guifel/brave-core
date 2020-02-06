@@ -1,0 +1,31 @@
+diff --git a/chrome/browser/ui/tabs/tab_strip_model.h b/chrome/browser/ui/tabs/tab_strip_model.h
+index 3e1ad42324a3..6826ce401d3d 100644
+--- a/chrome/browser/ui/tabs/tab_strip_model.h
++++ b/chrome/browser/ui/tabs/tab_strip_model.h
+@@ -130,6 +130,7 @@ class TabStripModel {
+   // Construct a TabStripModel with a delegate to help it do certain things
+   // (see the TabStripModelDelegate documentation). |delegate| cannot be NULL.
+   explicit TabStripModel(TabStripModelDelegate* delegate, Profile* profile);
++  virtual
+   ~TabStripModel();
+
+   // Retrieves the TabStripModelDelegate associated with this TabStripModel.
+@@ -397,8 +398,10 @@ class TabStripModel {
+   void CloseSelectedTabs();
+
+   // Select adjacent tabs
++  virtual
+   void SelectNextTab(
+       UserGestureDetails detail = UserGestureDetails(GestureType::kOther));
++  virtual
+   void SelectPreviousTab(
+       UserGestureDetails detail = UserGestureDetails(GestureType::kOther));
+
+@@ -515,6 +518,7 @@ class TabStripModel {
+   bool ShouldResetOpenerOnActiveTabChange(content::WebContents* contents) const;
+
+  private:
++  friend class BraveTabStripModel;
+   FRIEND_TEST_ALL_PREFIXES(TabStripModelTest, GetIndicesClosedByCommand);
+
+   class WebContentsData;
