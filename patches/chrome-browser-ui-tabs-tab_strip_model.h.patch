@@ -1,16 +1,8 @@
 diff --git a/chrome/browser/ui/tabs/tab_strip_model.h b/chrome/browser/ui/tabs/tab_strip_model.h
-index f7282146e44d05a4f923adeed59089423bc6be62..a1c4e365b54d5c35be933832bef3fc9a3b8461a9 100644
+index f7282146e44d05a4f923adeed59089423bc6be62..1a92bed95ca16c45a982238c7cf5e78648125d40 100644
 --- a/chrome/browser/ui/tabs/tab_strip_model.h
 +++ b/chrome/browser/ui/tabs/tab_strip_model.h
-@@ -136,6 +136,7 @@ class TabStripModel : public TabGroupController {
-   // Construct a TabStripModel with a delegate to help it do certain things
-   // (see the TabStripModelDelegate documentation). |delegate| cannot be NULL.
-   explicit TabStripModel(TabStripModelDelegate* delegate, Profile* profile);
-+  virtual
-   ~TabStripModel() override;
- 
-   // Retrieves the TabStripModelDelegate associated with this TabStripModel.
-@@ -384,8 +385,10 @@ class TabStripModel : public TabGroupController {
+@@ -384,8 +384,10 @@ class TabStripModel : public TabGroupController {
    void CloseSelectedTabs();
  
    // Select adjacent tabs
@@ -21,7 +13,7 @@ index f7282146e44d05a4f923adeed59089423bc6be62..a1c4e365b54d5c35be933832bef3fc9a
    void SelectPreviousTab(
        UserGestureDetails detail = UserGestureDetails(GestureType::kOther));
  
-@@ -512,6 +515,7 @@ class TabStripModel : public TabGroupController {
+@@ -512,6 +514,7 @@ class TabStripModel : public TabGroupController {
    bool ShouldResetOpenerOnActiveTabChange(content::WebContents* contents) const;
  
   private:
