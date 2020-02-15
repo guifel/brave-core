@@ -15,7 +15,7 @@
 - (void)getOneTimeTips:(ledger::PublisherInfoListCallback)callback;
 - (void)getPendingContributions:(ledger::PendingContributionInfoListCallback)callback;
 - (void)getPendingContributionsTotal:(ledger::PendingContributionsTotalCallback)callback;
-- (void)saveRecurringTip:(ledger::ContributionInfoPtr)info callback:(ledger::SaveRecurringTipCallback)callback;
+- (void)saveRecurringTip:(ledger::RecurringTipPtr)info callback:(ledger::SaveRecurringTipCallback)callback;
 - (void)getRecurringTips:(ledger::PublisherInfoListCallback)callback;
 - (void)killTimer:(const uint32_t)timer_id;
 - (void)loadActivityInfo:(ledger::ActivityInfoFilterPtr)filter callback:(ledger::PublisherInfoCallback)callback;
@@ -28,17 +28,16 @@
 - (void)loadState:(const std::string &)name callback:(ledger::OnLoadCallback)callback;
 - (void)loadURL:(const std::string &)url headers:(const std::vector<std::string> &)headers content:(const std::string &)content contentType:(const std::string &)contentType method:(const ledger::UrlMethod)method callback:(ledger::LoadURLCallback)callback;
 - (std::unique_ptr<ledger::LogStream>)log:(const char *)file line:(int)line logLevel:(const ledger::LogLevel)log_level;
-- (void)onGrantFinish:(ledger::Result)result grant:(ledger::GrantPtr)grant;
 - (void)onPanelPublisherInfo:(ledger::Result)result publisherInfo:(ledger::PublisherInfoPtr)publisher_info windowId:(uint64_t)windowId;
-- (void)onReconcileComplete:(ledger::Result)result viewingId:(const std::string &)viewing_id type:(const ledger::RewardsType)type probi:(const std::string &)probi;
+- (void)onReconcileComplete:(ledger::Result)result viewingId:(const std::string &)viewing_id type:(const ledger::RewardsType)type amount:(const double)amount;
 - (void)removeRecurringTip:(const std::string &)publisher_key callback:(ledger::RemoveRecurringTipCallback)callback;
 - (void)restorePublishers:(ledger::RestorePublishersCallback)callback;
 - (void)onWalletProperties:(ledger::Result)result arg1:(ledger::WalletPropertiesPtr)arg1;
 - (void)removeAllPendingContributions:(ledger::RemovePendingContributionCallback)callback;
-- (void)removePendingContribution:(const std::string &)publisher_key viewingId:(const std::string &)viewing_id addedDate:(uint64_t)added_date callback:(ledger::RemovePendingContributionCallback )callback;
+- (void)removePendingContribution:(const uint64_t)id callback:(ledger::RemovePendingContributionCallback )callback;
 - (void)resetState:(const std::string &)name callback:(ledger::OnResetCallback)callback;
 - (void)saveActivityInfo:(ledger::PublisherInfoPtr)publisher_info callback:(ledger::PublisherInfoCallback)callback;
-- (void)saveContributionInfo:(const std::string &)probi month:(const ledger::ActivityMonth)month year:(const int)year date:(const uint32_t)date publisherKey:(const std::string &)publisher_key type:(const ledger::RewardsType)type;
+- (void)saveContributionInfo:(ledger::ContributionInfoPtr)info callback:(ledger::ResultCallback)callback;
 - (void)saveLedgerState:(const std::string &)ledger_state handler:(ledger::LedgerCallbackHandler *)handler;
 - (void)saveMediaPublisherInfo:(const std::string &)media_key publisherId:(const std::string &)publisher_id;
 - (void)saveNormalizedPublisherList:(ledger::PublisherInfoList)normalized_list;
@@ -82,5 +81,21 @@
 - (void)insertOrUpdateContributionQueue:(ledger::ContributionQueuePtr)info callback:(ledger::ResultCallback)callback;
 - (void)deleteContributionQueue:(const uint64_t) id callback:(ledger::ResultCallback)callback;
 - (void)getFirstContributionQueue:(ledger::GetFirstContributionQueueCallback)callback;
+- (void)insertOrUpdatePromotion:(ledger::PromotionPtr)info callback:(ledger::ResultCallback)callback;
+- (void)getPromotion:(const std::string&) id callback:(ledger::GetPromotionCallback)callback;
+- (void)insertOrUpdateUnblindedToken:(ledger::UnblindedTokenPtr)info callback:(ledger::ResultCallback)callback;
+- (void)getAllUnblindedTokens:(ledger::GetAllUnblindedTokensCallback)callback;
+- (void)deleteUnblindedTokens:(const std::vector<std::string>&)list callback:(ledger::ResultCallback)callback;
+- (ledger::ClientInfoPtr)getClientInfo;
+- (void)unblindedTokensReady;
+- (void)getAllPromotions:(ledger::GetAllPromotionsCallback)callback;
+- (void)deleteUnblindedTokensForPromotion:(const std::string&)promotion_id callback:(ledger::ResultCallback)callback;
+- (void)getTransactionReport:(const ledger::ActivityMonth)month year:(const uint32_t)year callback:(ledger::GetTransactionReportCallback)callback;
+- (void)getContributionReport:(const ledger::ActivityMonth)month year:(const uint32_t)year callback:(ledger::GetContributionReportCallback)callback;
+- (void)getIncompleteContributions:(ledger::GetIncompleteContributionsCallback)callback;
+- (void)getContributionInfo:(const std::string&)contribution_id callback:(ledger::GetContributionInfoCallback)callback;
+- (void)updateContributionInfoStepAndCount:(const std::string&)contribution_id step:(const ledger::ContributionStep)step retry_count:(const int32_t)retry_count callback:(ledger::ResultCallback)callback;
+- (void)updateContributionInfoContributedAmount:(const std::string&)contribution_id publisher_key:(const std::string&)publisher_key callback:(ledger::ResultCallback)callback;
+- (void)reconcileStampReset;
 
 @end

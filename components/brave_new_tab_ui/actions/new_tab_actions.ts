@@ -69,6 +69,11 @@ export const statsUpdated = (stats: Stats) =>
 export const privateTabDataUpdated = (data: PrivateTabData) =>
   action(types.NEW_TAB_PRIVATE_TAB_DATA_UPDATED, data)
 
+export const dismissBrandedWallpaperNotification = (isUserAction: boolean) =>
+  action(types.NEW_TAB_DISMISS_BRANDED_WALLPAPER_NOTIFICATION, {
+    isUserAction
+  })
+
 export const preferencesUpdated = (preferences: Preferences) =>
   action(types.NEW_TAB_PREFERENCES_UPDATED, preferences)
 
@@ -77,17 +82,13 @@ export const setInitialData = (initialData: InitialData) =>
 
 export const createWallet = () => action(types.CREATE_WALLET, {})
 
-export const onEnabledMain = (enabledMain: boolean) => action(types.ON_ENABLED_MAIN, {
-  enabledMain
+export const onEnabledMain = (enabledMain: boolean, enabledAds?: boolean) => action(types.ON_ENABLED_MAIN, {
+  enabledMain,
+  enabledAds
 })
 
 export const onAdsEnabled = (enabled: boolean) => action(types.ON_ADS_ENABLED, {
   enabled
-})
-
-export const onRewardsSettingSave = (key: string, value: any) => action(types.ON_REWARDS_SETTING_SAVE, {
-  key,
-  value
 })
 
 export const onWalletInitialized = (result: NewTab.RewardsResult) => action(types.ON_WALLET_INITIALIZED, {
@@ -98,12 +99,15 @@ export const onAdsEstimatedEarnings = (amount: number) => action(types.ON_ADS_ES
   amount
 })
 
-export const onBalanceReports = (reports: Record<string, NewTab.RewardsReport>) => action(types.ON_BALANCE_REPORTS, {
-  reports
+export const onBalanceReport = (properties: {month: number, year: number, report: NewTab.RewardsBalanceReport}) => action(types.ON_BALANCE_REPORT, {
+  month: properties.month,
+  year: properties.year,
+  report: properties.report
 })
 
-export const onGrant = (properties: NewTab.GrantResponse) => action(types.ON_GRANT, {
-  properties
+export const onPromotions = (result: number, promotions: NewTab.Promotion[]) => action(types.ON_PROMOTIONS, {
+  result,
+  promotions
 })
 
 export const dismissNotification = (id: string) => action(types.DISMISS_NOTIFICATION, {
@@ -121,3 +125,8 @@ export const onWalletExists = (exists: boolean) => action(types.ON_WALLET_EXISTS
 export const setInitialRewardsData = (initialRewardsData: InitialRewardsData) => action(types.SET_INITIAL_REWARDS_DATA, initialRewardsData)
 
 export const setPreInitialRewardsData = (preInitialRewardsData: PreInitialRewardsData) => action(types.SET_PRE_INITIAL_REWARDS_DATA, preInitialRewardsData)
+
+export const onPromotionFinish = (result: NewTab.RewardsResult, promotion: NewTab.Promotion) => action(types.ON_PROMOTION_FINISH, {
+  result,
+  promotion
+})

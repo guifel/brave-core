@@ -57,20 +57,11 @@ interface BatLedger {
 
   SetPublisherExclude(string publisher_key, ledger.mojom.PublisherExclude exclude) => (ledger.mojom.Result result);
   RestorePublishers() => (ledger.mojom.Result result);
-
-  SetBalanceReportItem(ledger.mojom.ActivityMonth month, int32 year, ledger.mojom.ReportType type, string probi);
-  OnReconcileCompleteSuccess(string viewing_id, ledger.mojom.RewardsType type, string probi,
-      ledger.mojom.ActivityMonth month, int32 year, uint32 data);
-
-  FetchGrants(string lang, string payment_id, string safetynet_token) =>
-      (ledger.mojom.Result result, array<ledger.mojom.Grant> grants);
-  GetGrantCaptcha(array<string> headers) => (string image, string hint);
+  FetchPromotions() => (ledger.mojom.Result result, array<ledger.mojom.Promotion> promotion);
+  ClaimPromotion(string payload) => (ledger.mojom.Result result, string response);
+  AttestPromotion(string promotion_id, string solution) => (ledger.mojom.Result result, ledger.mojom.Promotion? promotion);
   GetWalletPassphrase() => (string wallet_passphrase);
-  RecoverWallet(string passPhrase) => (ledger.mojom.Result result, double balance, array<ledger.mojom.Grant?> grants);
-  SolveGrantCaptcha(string solution, string promotionId);
-
-  GetGrantViaSafetynetCheck(string promotion_id);
-  ApplySafetynetToken(string promotion_id, string result_string);
+  RecoverWallet(string passPhrase) => (ledger.mojom.Result result, double balance);
   
   SetRewardsMainEnabled(bool enabled);
   SetPublisherMinVisitTime(uint64 duration_in_seconds);
@@ -84,10 +75,8 @@ interface BatLedger {
 
   OnTimer(uint32 timer_id);
 
-  GetAllBalanceReports() =>
-      (map<string, ledger.mojom.BalanceReportInfo> reports);
   GetBalanceReport(ledger.mojom.ActivityMonth month, int32 year) =>
-      (bool result, ledger.mojom.BalanceReportInfo report);
+      (ledger.mojom.Result result, ledger.mojom.BalanceReportInfo report);
 
   IsWalletCreated() => (bool wallet_created);
 
@@ -99,7 +88,7 @@ interface BatLedger {
       (ledger.mojom.PublisherBanner? banner);
 
   DoDirectTip(string publisher_id,
-              int32 amount,
+              double amount,
               string currency) => (ledger.mojom.Result result);
 
   RemoveRecurringTip(string publisher_key) => (ledger.mojom.Result result);
@@ -114,7 +103,7 @@ interface BatLedger {
   GetTransactionHistory() => (string transactions);
   GetRewardsInternalsInfo() => (ledger.mojom.RewardsInternalsInfo info);
 
-  SaveRecurringTip(ledger.mojom.ContributionInfo info) => (ledger.mojom.Result result);
+  SaveRecurringTip(ledger.mojom.RecurringTip info) => (ledger.mojom.Result result);
   GetRecurringTips() => (array<ledger.mojom.PublisherInfo> list);
   GetOneTimeTips() => (array<ledger.mojom.PublisherInfo> list);
 
@@ -139,8 +128,7 @@ interface BatLedger {
 
   GetPendingContributions() => (array<ledger.mojom.PendingContributionInfo> list);
 
-  RemovePendingContribution(string publisher_key, string viewing_id,
-      uint64 added_date) => (ledger.mojom.Result result);
+  RemovePendingContribution(uint64 id) => (ledger.mojom.Result result);
 
   RemoveAllPendingContributions() => (ledger.mojom.Result result);
 
@@ -153,6 +141,12 @@ interface BatLedger {
   ExternalWalletAuthorization(string wallet_type, map<string, string> args) => (ledger.mojom.Result result, map<string, string> args);
 
   DisconnectWallet(string wallet_type) => (ledger.mojom.Result result);
+
+  GetAnonWalletStatus() => (ledger.mojom.Result result);
+
+  GetTransactionReport(ledger.mojom.ActivityMonth month, int32 year) => (array<ledger.mojom.TransactionReportInfo> list);
+
+  GetContributionReport(ledger.mojom.ActivityMonth month, int32 year) => (array<ledger.mojom.ContributionReportInfo> list);
 };
 
 interface BatLedgerClient {
@@ -165,8 +159,7 @@ interface BatLedgerClient {
 
   OnWalletProperties(ledger.mojom.Result result, ledger.mojom.WalletProperties? properties);
   OnReconcileComplete(ledger.mojom.Result result, string viewing_id,
-      string probi, ledger.mojom.RewardsType type);
-  OnGrantFinish(ledger.mojom.Result result, ledger.mojom.Grant? grant);
+      double amount, ledger.mojom.RewardsType type);
 
   SavePublisherInfo(ledger.mojom.PublisherInfo publisher_info) =>
       (ledger.mojom.Result result, ledger.mojom.PublisherInfo? publisher_info);
@@ -182,7 +175,7 @@ interface BatLedgerClient {
                        uint64 window_id);
   FetchFavIcon(string url, string favicon_key) => (bool success,
       string favicon_url);
-  SaveRecurringTip(ledger.mojom.ContributionInfo info) => (ledger.mojom.Result result);
+  SaveRecurringTip(ledger.mojom.RecurringTip info) => (ledger.mojom.Result result);
   GetRecurringTips() => (
       array<ledger.mojom.PublisherInfo> publisher_info_list,
       uint32 next_record);
@@ -192,7 +185,6 @@ interface BatLedgerClient {
 
   LoadNicewareList() => (ledger.mojom.Result result, string data);
   RemoveRecurringTip(string publisher_key) => (ledger.mojom.Result result);
-  OnGrantViaSafetynetCheck(string promotion_id, string nonce);
 
   LoadURL(string url, array<string> headers, string content,
       string content_type, ledger.mojom.UrlMethod method) => (int32 status_code, string response,
@@ -201,8 +193,7 @@ interface BatLedgerClient {
   [Sync]
   SetTimer(uint64 time_offset) => (uint32 timer_id);
   KillTimer(uint32 timer_id);
-  SaveContributionInfo(string probi, ledger.mojom.ActivityMonth month, int32 year, uint32 date,
-      string publisher_key, ledger.mojom.RewardsType type);
+  SaveContributionInfo(ledger.mojom.ContributionInfo info) => (ledger.mojom.Result result);
   SaveMediaPublisherInfo(string media_key, string publisher_id);
 
   [Sync]
@@ -265,8 +256,7 @@ interface BatLedgerClient {
 
   GetPendingContributions() => (array<ledger.mojom.PendingContributionInfo> list);
 
-  RemovePendingContribution(string publisher_key, string viewing_id,
-      uint64 added_date) => (ledger.mojom.Result result);
+  RemovePendingContribution(uint64 id) => (ledger.mojom.Result result);
 
   RemoveAllPendingContributions() => (ledger.mojom.Result result);
 
@@ -294,4 +284,28 @@ interface BatLedgerClient {
   InsertOrUpdateContributionQueue(ledger.mojom.ContributionQueue info) => (ledger.mojom.Result result);
   DeleteContributionQueue(uint64 id) => (ledger.mojom.Result result);
   GetFirstContributionQueue() => (ledger.mojom.ContributionQueue? info);
+  InsertOrUpdatePromotion(ledger.mojom.Promotion info) => (ledger.mojom.Result result);
+  GetPromotion(string id) => (ledger.mojom.Promotion? info);
+  GetAllPromotions() => (map<string, ledger.mojom.Promotion> promotions);
+  InsertOrUpdateUnblindedToken(ledger.mojom.UnblindedToken info) => (ledger.mojom.Result result);
+  GetAllUnblindedTokens() => (array<ledger.mojom.UnblindedToken> info);
+  DeleteUnblindedTokens(array<string> id_list) => (ledger.mojom.Result result);
+  DeleteUnblindedTokensForPromotion(string promotion_id) => (ledger.mojom.Result result);
+  [Sync]
+  GetClientInfo() => (ledger.mojom.ClientInfo info);
+  UnblindedTokensReady();
+
+  GetTransactionReport(ledger.mojom.ActivityMonth month, int32 year) => (array<ledger.mojom.TransactionReportInfo> list);
+
+  GetContributionReport(ledger.mojom.ActivityMonth month, int32 year) => (array<ledger.mojom.ContributionReportInfo> list);
+
+  GetIncompleteContributions() => (array<ledger.mojom.ContributionInfo> list);
+
+  GetContributionInfo(string contribution_id) => (ledger.mojom.ContributionInfo info);
+
+  UpdateContributionInfoStepAndCount(string contribution_id, ledger.mojom.ContributionStep step, int32 retry_count) => (ledger.mojom.Result result);
+
+  UpdateContributionInfoContributedAmount(string contribution_id, string publisher_key) => (ledger.mojom.Result result);
+
+  ReconcileStampReset();
 };

@@ -7,15 +7,20 @@
 
 #include <memory>
 
+#include "base/feature_list.h"
 #include "base/memory/ptr_util.h"
 #include "brave/browser/ui/webui/brave_adblock_ui.h"
+#include "brave/browser/ui/webui/webcompat_reporter_ui.h"
 #include "brave/browser/ui/webui/brave_new_tab_ui.h"
+#include "brave/common/brave_features.h"
 #include "brave/common/pref_names.h"
 #include "brave/common/webui_url_constants.h"
 #include "brave/components/brave_rewards/browser/buildflags/buildflags.h"
 #include "brave/components/brave_sync/buildflags/buildflags.h"
 #include "brave/components/brave_wallet/browser/buildflags/buildflags.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/common/url_constants.h"
+#include "components/prefs/pref_service.h"
 #include "url/gurl.h"
 
 #if !defined(OS_ANDROID)
@@ -35,7 +40,7 @@
 
 #if BUILDFLAG(ENABLE_BRAVE_SYNC)
 #include "brave/browser/ui/webui/sync/sync_ui.h"
-#include "brave/components/brave_sync/switches.h"
+#include "components/sync/driver/sync_driver_switches.h"
 #endif
 
 using content::WebUI;
@@ -59,13 +64,15 @@ WebUIController* NewWebUI<BasicUI>(WebUI* web_ui, const GURL& url) {
   auto host = url.host_piece();
   if (host == kAdblockHost) {
     return new BraveAdblockUI(web_ui, url.host());
+  } else if (host == kWebcompatReporterHost) {
+    return new WebcompatReporterUI(web_ui, url.host());
 #if BUILDFLAG(BRAVE_WALLET_ENABLED)
   } else if (host == kWalletHost) {
     return new BraveWalletUI(web_ui, url.host());
 #endif  // BUILDFLAG(BRAVE_WALLET_ENABLED)
 #if BUILDFLAG(ENABLE_BRAVE_SYNC)
   } else if (host == kBraveUISyncHost &&
-             brave_sync::switches::IsBraveSyncAllowedByFlag()) {
+             switches::IsSyncAllowedByFlag()) {
     return new SyncUI(web_ui, url.host());
 #endif  // BUILDFLAG(ENABLE_BRAVE_SYNC)
 #if BUILDFLAG(BRAVE_REWARDS_ENABLED)
@@ -96,6 +103,7 @@ WebUIController* NewWebUI<BasicUI>(WebUI* web_ui, const GURL& url) {
 WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
                                              const GURL& url) {
   if (url.host_piece() == kAdblockHost ||
+      url.host_piece() == kWebcompatReporterHost ||
 #if BUILDFLAG(BRAVE_WALLET_ENABLED)
       url.host_piece() == kWalletHost ||
 #endif
@@ -108,7 +116,7 @@ WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
       url.host_piece() == chrome::kChromeUIWelcomeURL ||
 #if BUILDFLAG(ENABLE_BRAVE_SYNC)
       (url.host_piece() == kBraveUISyncHost &&
-       brave_sync::switches::IsBraveSyncAllowedByFlag()) ||
+       switches::IsSyncAllowedByFlag()) ||
 #endif
       url.host_piece() == chrome::kChromeUINewTabHost ||
       url.host_piece() == chrome::kChromeUISettingsHost) {
@@ -118,10 +126,35 @@ WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
   return nullptr;
 }
 
+#if defined(OS_ANDROID)
+bool ShouldBlockRewardsWebUI(
+      content::BrowserContext* browser_context, const GURL& url) {
+  if (url.host_piece() != kRewardsPageHost &&
+      url.host_piece() != kRewardsInternalsHost) {
+    return false;
+  }
+  if (!base::FeatureList::IsEnabled(features::kBraveRewards)) {
+    return true;
+  }
+  Profile* profile = Profile::FromBrowserContext(browser_context);
+  if (profile &&
+      profile->GetPrefs() &&
+      profile->GetPrefs()->GetBoolean(kSafetynetCheckFailed)) {
+    return true;
+  }
+  return false;
+}
+#endif  // defined(OS_ANDROID)
+
 }  // namespace
 
 WebUI::TypeID BraveWebUIControllerFactory::GetWebUIType(
       content::BrowserContext* browser_context, const GURL& url) {
+#if defined(OS_ANDROID)
+  if (ShouldBlockRewardsWebUI(browser_context, url)) {
+    return WebUI::kNoWebUI;
+  }
+#endif  // defined(OS_ANDROID)
   WebUIFactoryFunction function = GetWebUIFactoryFunction(NULL, url);
   if (function) {
     return reinterpret_cast<WebUI::TypeID>(function);

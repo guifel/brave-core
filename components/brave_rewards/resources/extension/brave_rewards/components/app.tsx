@@ -46,28 +46,23 @@ export class RewardsPanel extends React.Component<Props, State> {
     })
 
     chrome.windows.getCurrent({}, this.onWindowCallback)
+
     chrome.braveRewards.getRewardsMainEnabled(((enabled: boolean) => {
       this.props.actions.onEnabledMain(enabled)
     }))
-
-    chrome.braveRewards.getACEnabled(((enabled: boolean) => {
-      this.props.actions.onEnabledAC(enabled)
-    }))
-
-    chrome.braveRewards.getRecurringTips((tips: RewardsExtension.RecurringTips) => {
-      this.props.actions.onRecurringTips(tips)
-    })
 
     chrome.braveRewards.getAllNotifications((list: RewardsExtension.Notification[]) => {
       this.props.actions.onAllNotifications(list)
     })
 
-    if (!this.props.rewardsPanelData.enabledMain) {
-      const { externalWallet } = this.props.rewardsPanelData
-      utils.getExternalWallet(this.actions, externalWallet)
-    }
-
     this.handleGrantNotification()
+
+    const { externalWallet, walletCreated } = this.props.rewardsPanelData
+
+    if (walletCreated) {
+      utils.getExternalWallet(this.actions, externalWallet)
+      this.getBalance()
+    }
   }
 
   componentDidUpdate (prevProps: Props, prevState: State) {
@@ -79,7 +74,14 @@ export class RewardsPanel extends React.Component<Props, State> {
     }
     if (!prevProps.rewardsPanelData.enabledMain && this.props.rewardsPanelData.enabledMain) {
       chrome.windows.getCurrent({}, this.onWindowCallback)
+      this.getBalance()
     }
+  }
+
+  getBalance () {
+    chrome.braveRewards.fetchBalance((balance: RewardsExtension.Balance) => {
+      this.actions.onBalance(balance)
+    })
   }
 
   handleGrantNotification = () => {
@@ -93,7 +95,15 @@ export class RewardsPanel extends React.Component<Props, State> {
       return
     }
 
-    this.actions.getGrantCaptcha(hash.split('#grant_')[1])
+    let promotionId = hash.split('#grant_')[1]
+
+    if (!promotionId) {
+      return
+    }
+
+    chrome.braveRewards.claimPromotion(promotionId, (properties: RewardsExtension.Captcha) => {
+      this.actions.onClaimPromotion(properties)
+    })
   }
 
   goToUphold = () => {
@@ -231,7 +241,7 @@ export class RewardsPanel extends React.Component<Props, State> {
 
   openTOS () {
     chrome.tabs.create({
-      url: 'https://brave.com/terms-of-use'
+      url: 'https://basicattentiontoken.org/user-terms-of-service'
     })
   }
 
@@ -267,27 +277,31 @@ export class RewardsPanel extends React.Component<Props, State> {
       walletCreateFailed,
       walletCreated,
       walletCreating,
-      walletProperties,
       walletCorrupted,
       balance,
-      externalWallet
+      externalWallet,
+      promotions
     } = this.props.rewardsPanelData
 
     const total = balance.total || 0
-    const converted = utils.convertBalance(total.toString(), balance.rates)
+    const converted = utils.convertBalance(total, balance.rates)
+    const claimedPromotions = utils.getClaimedPromotions(promotions || [])
 
     if (!walletCreated || walletCorrupted) {
       return (
-        <PanelWelcome
-          error={walletCreateFailed}
-          creating={walletCreating}
-          variant={'two'}
-          optInAction={this.onCreate}
-          optInErrorAction={this.onCreate}
-          moreLink={this.openRewards}
-          onTOSClick={this.openTOS}
-          onPrivacyClick={this.openPrivacyPolicy}
-        />
+        <div data-test-id={'rewards-panel'}>
+          <PanelWelcome
+            error={walletCreateFailed}
+            creating={walletCreating}
+            variant={'two'}
+            optInAction={this.onCreate}
+            optInErrorAction={this.onCreate}
+            moreLink={this.openRewards}
+            onTOSClick={this.openTOS}
+            onlyAnonWallet={this.state.onlyAnonWallet}
+            onPrivacyClick={this.openPrivacyPolicy}
+          />
+        </div>
       )
     }
 
@@ -299,7 +313,7 @@ export class RewardsPanel extends React.Component<Props, State> {
     }
 
     return (
-      <>
+      <div data-test-id={'rewards-panel'}>
         {
           enabledMain
           ? <Panel
@@ -315,9 +329,8 @@ export class RewardsPanel extends React.Component<Props, State> {
                 showSecActions={false}
                 showCopy={false}
                 onlyAnonWallet={this.state.onlyAnonWallet}
-                grants={utils.getGrants(walletProperties.grants)}
+                grants={utils.generatePromotions(claimedPromotions)}
                 converted={utils.formatConverted(converted)}
-                convertProbiToFixed={utils.convertProbiToFixed}
                 walletState={walletStatus}
                 onVerifyClick={onVerifyClick}
                 onDisconnectClick={this.onDisconnectClick}
@@ -333,7 +346,7 @@ export class RewardsPanel extends React.Component<Props, State> {
               </WalletWrapper>
             </>
         }
-      </>
+      </div>
     )
   }
 }

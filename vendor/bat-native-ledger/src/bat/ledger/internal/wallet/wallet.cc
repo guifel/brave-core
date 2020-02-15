@@ -5,21 +5,26 @@
 
 #include "bat/ledger/internal/wallet/wallet.h"
 
+#include <map>
 #include <utility>
 
 #include "base/json/json_writer.h"
 #include "base/strings/stringprintf.h"
+#include "base/values.h"
 #include "bat/ledger/global_constants.h"
 #include "bat/ledger/internal/bat_helper.h"
 #include "bat/ledger/internal/ledger_impl.h"
-#include "bat/ledger/internal/rapidjson_bat_helper.h"
+#include "bat/ledger/internal/properties/unsigned_tx_properties.h"
+#include "bat/ledger/internal/properties/wallet_info_properties.h"
 #include "bat/ledger/internal/state_keys.h"
+#include "bat/ledger/internal/state/wallet_state.h"
+#include "bat/ledger/internal/state/unsigned_tx_state.h"
+#include "bat/ledger/internal/request/request_util.h"
 #include "bat/ledger/internal/wallet/balance.h"
 #include "bat/ledger/internal/wallet/create.h"
 #include "bat/ledger/internal/wallet/recover.h"
 #include "bat/ledger/internal/wallet/wallet_util.h"
 #include "bat/ledger/internal/uphold/uphold.h"
-#include "mojo/public/cpp/bindings/map.h"
 #include "net/http/http_status_code.h"
 
 #include "wally_bip39.h"  // NOLINT
@@ -66,18 +71,19 @@ void Wallet::GetWalletProperties(
   std::string passphrase = GetWalletPassphrase();
 
   if (payment_id.empty() || passphrase.empty()) {
-    braveledger_bat_helper::WALLET_PROPERTIES_ST properties;
-    ledger_->OnWalletProperties(ledger::Result::CORRUPTED_WALLET, properties);
+    ledger::WalletProperties properties;
+    callback(ledger::Result::CORRUPTED_WALLET,
+             WalletPropertiesToWalletInfo(properties));
     return;
   }
 
   std::string path = (std::string)WALLET_PROPERTIES
       + payment_id
       + WALLET_PROPERTIES_END;
-  const std::string url = braveledger_bat_helper::buildURL(
+  const std::string url = braveledger_request_util::BuildUrl(
       path,
       PREFIX_V2,
-      braveledger_bat_helper::SERVER_TYPES::BALANCE);
+      braveledger_request_util::ServerTypes::BALANCE);
   auto load_callback = std::bind(&Wallet::WalletPropertiesCallback,
                             this,
                             _1,
@@ -93,21 +99,12 @@ void Wallet::GetWalletProperties(
 }
 
 ledger::WalletPropertiesPtr Wallet::WalletPropertiesToWalletInfo(
-    const braveledger_bat_helper::WALLET_PROPERTIES_ST& properties) {
+    const ledger::WalletProperties& properties) {
   ledger::WalletPropertiesPtr wallet = ledger::WalletProperties::New();
-  wallet->parameters_choices = properties.parameters_choices_;
+  wallet->parameters_choices = properties.parameters_choices;
   wallet->fee_amount = ledger_->GetContributionAmount();
-
-  for (size_t i = 0; i < properties.grants_.size(); i ++) {
-    ledger::GrantPtr grant = ledger::Grant::New();
-
-    grant->altcurrency = properties.grants_[i].altcurrency;
-    grant->probi = properties.grants_[i].probi;
-    grant->expiry_time = properties.grants_[i].expiryTime;
-    grant->type = properties.grants_[i].type;
-
-    wallet->grants.push_back(std::move(grant));
-  }
+  wallet->default_tip_choices = properties.default_tip_choices;
+  wallet->default_monthly_tip_choices = properties.default_monthly_tip_choices;
 
   return wallet;
 }
@@ -117,16 +114,18 @@ void Wallet::WalletPropertiesCallback(
     const std::string& response,
     const std::map<std::string, std::string>& headers,
     ledger::OnWalletPropertiesCallback callback) {
-  braveledger_bat_helper::WALLET_PROPERTIES_ST properties;
+  ledger::WalletProperties properties;
   ledger_->LogResponse(__func__, response_status_code, response, headers);
   if (response_status_code != net::HTTP_OK) {
-    ledger_->OnWalletProperties(ledger::Result::LEDGER_ERROR, properties);
+    callback(ledger::Result::LEDGER_ERROR,
+             WalletPropertiesToWalletInfo(properties));
     return;
   }
 
   ledger::WalletPropertiesPtr wallet;
 
-  bool ok = braveledger_bat_helper::loadFromJson(&properties, response);
+  const ledger::WalletState wallet_state;
+  bool ok = wallet_state.FromJson(response, &properties);
 
   if (!ok) {
     BLOG(ledger_, ledger::LogLevel::LOG_ERROR) <<
@@ -142,16 +141,16 @@ void Wallet::WalletPropertiesCallback(
 }
 
 std::string Wallet::GetWalletPassphrase() const {
-  braveledger_bat_helper::WALLET_INFO_ST wallet_info = ledger_->GetWalletInfo();
+  ledger::WalletInfoProperties wallet_info = ledger_->GetWalletInfo();
   std::string passPhrase;
-  if (wallet_info.keyInfoSeed_.size() == 0) {
+  if (wallet_info.key_info_seed.size() == 0) {
     return passPhrase;
   }
 
   char* words = nullptr;
   int result = bip39_mnemonic_from_bytes(nullptr,
-                                         &wallet_info.keyInfoSeed_.front(),
-                                         wallet_info.keyInfoSeed_.size(),
+                                         &wallet_info.key_info_seed.front(),
+                                         wallet_info.key_info_seed.size(),
                                          &words);
   if (result != 0) {
     DCHECK(false);
@@ -338,24 +337,26 @@ std::string Wallet::GetClaimPayload(
     const std::string user_funds,
     const std::string new_address,
     const std::string anon_address) {
-  braveledger_bat_helper::WALLET_INFO_ST wallet_info = ledger_->GetWalletInfo();
+  ledger::WalletInfoProperties wallet_info = ledger_->GetWalletInfo();
 
-  braveledger_bat_helper::UNSIGNED_TX unsigned_tx;
-  unsigned_tx.amount_ = user_funds;
-  unsigned_tx.currency_ = "BAT";
-  unsigned_tx.destination_ = new_address;
-  const std::string octets =
-      braveledger_bat_helper::stringifyUnsignedTx(unsigned_tx);
+  ledger::UnsignedTxProperties unsigned_tx;
+  unsigned_tx.amount = user_funds;
+  unsigned_tx.currency = "BAT";
+  unsigned_tx.destination = new_address;
+  const ledger::UnsignedTxState unsigned_tx_state;
+  const std::string octets = unsigned_tx_state.ToJson(unsigned_tx);
 
   std::string header_digest = "SHA-256=" +
       braveledger_bat_helper::getBase64(
           braveledger_bat_helper::getSHA256(octets));
 
-  std::string header_keys[1] = {"digest"};
-  std::string header_values[1] = {header_digest};
+  std::vector<std::string> header_keys;
+  header_keys.push_back("digest");
+  std::vector<std::string> header_values;
+  header_values.push_back(header_digest);
 
   std::vector<uint8_t> secret_key = braveledger_bat_helper::getHKDF(
-      wallet_info.keyInfoSeed_);
+      wallet_info.key_info_seed);
   std::vector<uint8_t> public_key;
   std::vector<uint8_t> new_secret_key;
   bool success = braveledger_bat_helper::getPublicKeyFromSeed(
@@ -369,7 +370,6 @@ std::string Wallet::GetClaimPayload(
   std::string header_signature = braveledger_bat_helper::sign(
       header_keys,
       header_values,
-      1,
       "primary",
       new_secret_key);
 
@@ -423,10 +423,9 @@ void Wallet::OnTransferAnonToExternalWalletAddress(
       WALLET_PROPERTIES,
       ledger_->GetPaymentId().c_str());
 
-  const std::string url = braveledger_bat_helper::buildURL(
+  const std::string url = braveledger_request_util::BuildUrl(
       path,
-      PREFIX_V2,
-      braveledger_bat_helper::SERVER_TYPES::LEDGER);
+      PREFIX_V2);
 
   auto transfer_callback = std::bind(&Wallet::OnTransferAnonToExternalWallet,
                           this,
@@ -457,37 +456,23 @@ void Wallet::OnTransferAnonToExternalWalletAddress(
       transfer_callback);
 }
 
-void Wallet::GetGrantViaSafetynetCheck(const std::string& promotion_id) {
-  ledger_->LoadURL(braveledger_bat_helper::buildURL(
-      (std::string)GET_PROMOTION_ATTESTATION + ledger_->GetPaymentId(),
-      PREFIX_V1),
-  std::vector<std::string>(), "", "",
-  ledger::UrlMethod::GET, std::bind(&Wallet::GetGrantViaSafetynetCheckCallback,
-                                   this,
-                                   promotion_id,
-                                   _1,
-                                   _2,
-                                   _3));
-}
+void Wallet::GetAnonWalletStatus(ledger::ResultCallback callback) {
+  const std::string payment_id = ledger_->GetPaymentId();
+  const std::string passphrase = GetWalletPassphrase();
+  const uint64_t stamp = ledger_->GetBootStamp();
+  const std::string persona_id = ledger_->GetPersonaId();
 
-void Wallet::GetGrantViaSafetynetCheckCallback(const std::string& promotion_id,
-                                                  int response_status_code,
-                                                  const std::string& response,
-                                                  const std::map<std::string,
-                                                  std::string>& headers) {
-  ledger_->LogResponse(__func__, response_status_code, response, headers);
-
-  if (response_status_code != net::HTTP_OK) {
-    // Attestation failed
-    braveledger_bat_helper::GRANT grant;
-    grant.promotionId = promotion_id;
-    ledger_->OnGrantFinish(ledger::Result::SAFETYNET_ATTESTATION_FAILED,
-        grant);
+  if (!payment_id.empty() && stamp != 0 && !persona_id.empty()) {
+    callback(ledger::Result::WALLET_CREATED);
     return;
   }
-  std::string nonce;
-  braveledger_bat_helper::getJSONValue("nonce", response, &nonce);
-  ledger_->OnGrantViaSafetynetCheck(promotion_id, nonce);
+
+  if (payment_id.empty() || passphrase.empty()) {
+    callback(ledger::Result::CORRUPTED_WALLET);
+    return;
+  }
+
+  callback(ledger::Result::LEDGER_OK);
 }
 
 }  // namespace braveledger_wallet

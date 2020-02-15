@@ -100,6 +100,7 @@ std::unique_ptr<BundleState> Bundle::GenerateFromCatalog(
   // TODO(Terry Mancey): Refactor function to use callbacks
 
   std::map<std::string, std::vector<AdInfo>> categories;
+  std::vector<AdConversionTrackingInfo> ad_conversions;
 
   // Campaigns
   for (const auto& campaign : catalog.GetCampaigns()) {
@@ -128,6 +129,7 @@ std::unique_ptr<BundleState> Bundle::GenerateFromCatalog(
         ad_info.start_timestamp = campaign.start_at;
         ad_info.end_timestamp = campaign.end_at;
         ad_info.daily_cap = campaign.daily_cap;
+        ad_info.advertiser_id = campaign.advertiser_id;
         ad_info.per_day = creative_set.per_day;
         ad_info.total_max = creative_set.total_max;
         ad_info.regions = regions;
@@ -135,6 +137,11 @@ std::unique_ptr<BundleState> Bundle::GenerateFromCatalog(
         ad_info.notification_text = creative.payload.body;
         ad_info.notification_url = creative.payload.target_url;
         ad_info.uuid = creative.creative_instance_id;
+
+        // OSes
+        if (!DoesOsSupportCreativeSet(creative_set)) {
+          continue;
+        }
 
         // Segments
         for (const auto& segment : creative_set.segments) {
@@ -168,6 +175,11 @@ std::unique_ptr<BundleState> Bundle::GenerateFromCatalog(
         }
       }
 
+      // Conversions
+      ad_conversions.insert(ad_conversions.end(),
+          creative_set.ad_conversions.begin(),
+              creative_set.ad_conversions.end());
+
       if (entries == 0) {
         BLOG(WARNING) << "creativeSet id " << creative_set.creative_set_id
             << " has an invalid creative";
@@ -181,11 +193,55 @@ std::unique_ptr<BundleState> Bundle::GenerateFromCatalog(
   state->catalog_id = catalog.GetId();
   state->catalog_version = catalog.GetVersion();
   state->catalog_ping = catalog.GetPing();
-  state->catalog_last_updated_timestamp_in_seconds =
-      Time::NowInSeconds();
+  state->catalog_last_updated_timestamp_in_seconds = Time::NowInSeconds();
   state->categories = categories;
+  state->ad_conversions = ad_conversions;
 
   return state;
+}
+
+bool Bundle::DoesOsSupportCreativeSet(
+    const CreativeSetInfo& creative_set) {
+  if (creative_set.oses.empty()) {
+    // Creative set supports all OSes
+    return true;
+  }
+
+  const std::string client_os = GetClientOS();
+  for (const auto& os : creative_set.oses) {
+    if (os.name == client_os) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+std::string Bundle::GetClientOS() {
+  ClientInfo client_info;
+  ads_client_->GetClientInfo(&client_info);
+
+  switch (client_info.platform) {
+    case UNKNOWN: {
+      NOTREACHED();
+      return "";
+    }
+    case WINDOWS: {
+      return "windows";
+    }
+    case MACOS: {
+      return "macos";
+    }
+    case IOS: {
+      return "ios";
+    }
+    case ANDROID_OS: {
+      return "android";
+    }
+    case LINUX: {
+      return "linux";
+    }
+  }
 }
 
 void Bundle::OnStateSaved(

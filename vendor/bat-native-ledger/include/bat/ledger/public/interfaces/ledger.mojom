@@ -1,12 +1,35 @@
+// Copyright (c) 2019 The Brave Authors. All rights reserved.
 // This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this file,
-// You can obtain one at http://mozilla.org/MPL/2.0/.
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module ledger.mojom;
 
+enum ContributionStep {
+  STEP_AC_TABLE_EMPTY = -4,
+  STEP_NOT_ENOUGH_FUNDS = -3,
+  STEP_FAILED = -2,
+  STEP_COMPLETED = -1,
+  STEP_NO = 0,
+  STEP_START = 1,
+  STEP_SUGGESTIONS = 2
+};
+
 struct ContributionInfo {
-  string publisher;  // Filled only for recurrent tips
-  double value;
-  uint64 date;
+  string contribution_id;
+  double amount;
+  RewardsType type;
+  ContributionStep step;
+  int32 retry_count;
+  uint64 created_at;
+
+  array<ContributionPublisher> publishers;
+};
+
+struct ContributionPublisher {
+  string contribution_id;
+  string publisher_key;
+  double total_amount;
+  double contributed_amount;
 };
 
 struct PublisherInfo {
@@ -24,8 +47,6 @@ struct PublisherInfo {
   string url;
   string provider;
   string favicon_url;
-
-  array<ContributionInfo> contributions;
 };
 
 struct PublisherBanner {
@@ -50,6 +71,7 @@ struct PendingContribution {
 };
 
 struct PendingContributionInfo {
+  uint64 id;
   string publisher_key;
   RewardsType type;
   PublisherStatus status = PublisherStatus.NOT_VERIFIED;
@@ -74,18 +96,11 @@ struct VisitData {
   string favicon_url;
 };
 
-struct Grant {
-  string altcurrency;
-  string probi;
-  string promotion_id;
-  uint64 expiry_time;
-  string type;
-};
-
 struct WalletProperties {
   double fee_amount;
   array<double> parameters_choices;
-  array<Grant> grants;
+  array<double> default_tip_choices;
+  array<double> default_monthly_tip_choices;
 };
 
 struct Balance {
@@ -124,15 +139,11 @@ struct ExternalWallet {
 };
 
 struct BalanceReportInfo {
-  string opening_balance;
-  string closing_balance;
-  string deposits;
-  string grants;
-  string earning_from_ads;
-  string auto_contribute;
-  string recurring_donation;
-  string one_time_donation;
-  string total;
+  double grants;
+  double earning_from_ads;
+  double auto_contribute;
+  double recurring_donation;
+  double one_time_donation;
 };
 
 enum ExcludeFilter {
@@ -206,7 +217,6 @@ enum Result {
   REGISTRATION_VERIFICATION_FAILED = 10,
   BAD_REGISTRATION_RESPONSE = 11,
   WALLET_CREATED = 12,
-  GRANT_NOT_FOUND = 13,
 
   AC_TABLE_EMPTY = 14,
   NOT_ENOUGH_FUNDS = 15,
@@ -253,10 +263,10 @@ enum RewardsType {
 };
 
 enum ReportType {
-  GRANT = 0,
+  GRANT_UGP = 0,
   AUTO_CONTRIBUTION = 1,
   DEPOSIT = 2,
-  ADS = 3,
+  GRANT_AD = 3,
   TIP_RECURRING = 4,
   TIP = 5,
 };
@@ -318,4 +328,87 @@ enum Environment {
   STAGING = 0,
   PRODUCTION = 1,
   DEVELOPMENT = 2
+};
+
+enum PromotionType {
+  UGP = 0,
+  ADS = 1
+};
+
+enum PromotionStatus {
+  ACTIVE = 0,
+  ATTESTED = 1,
+  CLAIMED = 2,
+  SIGNED_TOKENS = 3,
+  FINISHED = 4,
+  OVER = 5
+};
+
+struct Promotion {
+  string id;
+  uint32 version;
+  PromotionType type;
+  string public_keys; // JSONStringArray
+  uint32 suggestions;
+  double approximate_value;
+  PromotionStatus status;
+  uint64 expires_at;
+  uint64 claimed_at;
+  bool legacy_claimed;
+  PromotionCreds? credentials;
+};
+
+struct PromotionCreds {
+  string tokens; // JSONStringArray
+  string blinded_creds; // JSONStringArray
+  string signed_creds; // JSONStringArray
+  string public_key;
+  string batch_proof;
+  string claim_id;
+};
+
+struct UnblindedToken {
+  uint64 id;
+  string token_value;
+  string public_key;
+  double value;
+  string promotion_id;
+  uint64 expires_at;
+};
+
+enum Platform {
+  DESKTOP = 0,
+  ANDROID_R = 1,
+  IOS = 2
+};
+
+enum OperatingSystem {
+  WINDOWS = 0,
+  MACOS = 1,
+  LINUX = 2,
+  UNDEFINED = 3
+};
+
+struct ClientInfo {
+  Platform platform;
+  OperatingSystem os;
+};
+
+struct RecurringTip {
+  string publisher_key;
+  double amount;
+  uint64 created_at;
+};
+
+struct TransactionReportInfo {
+  double amount;
+  ReportType type;
+  uint64 created_at;
+};
+
+struct ContributionReportInfo {
+  double amount;
+  ReportType type;
+  array<PublisherInfo> publishers;
+  uint64 created_at;
 };

@@ -79,7 +79,7 @@ class LogStreamImpl : public ads::LogStream {
 ///////////////////////////////////////////////////////////////////////////////
 
 BatAdsClientMojoBridge::BatAdsClientMojoBridge(
-    mojom::BatAdsClientAssociatedPtrInfo client_info) {
+    mojo::PendingAssociatedRemote<mojom::BatAdsClient> client_info) {
   bat_ads_client_.Bind(std::move(client_info));
 }
 
@@ -94,6 +94,16 @@ bool BatAdsClientMojoBridge::IsEnabled() const {
   bool is_enabled;
   bat_ads_client_->IsEnabled(&is_enabled);
   return is_enabled;
+}
+
+bool BatAdsClientMojoBridge::ShouldAllowAdConversionTracking() const {
+  if (!connected()) {
+    return false;
+  }
+
+  bool should_allow;
+  bat_ads_client_->ShouldAllowAdConversionTracking(&should_allow);
+  return should_allow;
 }
 
 bool BatAdsClientMojoBridge::CanShowBackgroundNotifications() const {
@@ -411,32 +421,65 @@ void BatAdsClientMojoBridge::SaveBundleState(
 void OnGetAds(
     const ads::OnGetAdsCallback& callback,
     const int32_t result,
-    const std::string& category,
+    const std::vector<std::string>& categories,
     const std::vector<std::string>& ad_info_json_list) {
   std::vector<ads::AdInfo> ads;
 
-  for (const auto& it : ad_info_json_list) {
+  for (const auto& json : ad_info_json_list) {
     ads::AdInfo ad_info;
-    if (ad_info.FromJson(it) == ads::Result::SUCCESS) {
-      ads.push_back(ad_info);
-    } else {
-      callback(ads::Result::FAILED, category, {});
+    if (ad_info.FromJson(json) != ads::Result::SUCCESS) {
+      callback(ads::Result::FAILED, categories, {});
       return;
     }
+
+    ads.push_back(ad_info);
   }
 
-  callback(ToAdsResult(result), category, ads);
+  callback(ToAdsResult(result), categories, ads);
 }
 
 void BatAdsClientMojoBridge::GetAds(
-    const std::string& category,
+    const std::vector<std::string>& categories,
     ads::OnGetAdsCallback callback) {
   if (!connected()) {
-    callback(ads::Result::FAILED, category, std::vector<ads::AdInfo>());
+    callback(ads::Result::FAILED, categories, std::vector<ads::AdInfo>());
     return;
   }
 
-  bat_ads_client_->GetAds(category, base::BindOnce(&OnGetAds,
+  bat_ads_client_->GetAds(categories, base::BindOnce(&OnGetAds,
+      std::move(callback)));
+}
+
+void OnGetAdConversions(
+    const ads::OnGetAdConversionsCallback& callback,
+    const int32_t result,
+    const std::string& url,
+    const std::vector<std::string>& ad_conversion_json_list) {
+  std::vector<ads::AdConversionTrackingInfo> ad_conversions;
+
+  for (const auto& json : ad_conversion_json_list) {
+    ads::AdConversionTrackingInfo ad_conversion;
+    if (ad_conversion.FromJson(json) != ads::Result::SUCCESS) {
+      callback(ads::Result::FAILED, url, {});
+      return;
+    }
+
+    ad_conversions.push_back(ad_conversion);
+  }
+
+  callback(ToAdsResult(result), url, ad_conversions);
+}
+
+void BatAdsClientMojoBridge::GetAdConversions(
+    const std::string& url,
+    ads::OnGetAdConversionsCallback callback) {
+  if (!connected()) {
+    callback(ads::Result::FAILED, url,
+        std::vector<ads::AdConversionTrackingInfo>());
+    return;
+  }
+
+  bat_ads_client_->GetAdConversions(url, base::BindOnce(&OnGetAdConversions,
       std::move(callback)));
 }
 

@@ -10,6 +10,7 @@ declare namespace RewardsTip {
     reconcileStamp: number
     balance: Balance
     externalWallet?: ExternalWallet
+    onlyAnonWallet?: boolean
   }
 
   interface ApplicationState {
@@ -70,7 +71,8 @@ declare namespace RewardsTip {
 
   export interface WalletProperties {
     choices: number[]
-    grants?: Grant[]
+    defaultTipChoices: number[]
+    defaultMonthlyTipChoices: number[]
   }
 
   export interface Grant {

@@ -7,7 +7,6 @@
 
 #include "base/base64.h"
 #include "base/strings/string_number_conversions.h"
-#include "base/strings/string_split.h"
 #include "base/strings/stringprintf.h"
 #include "bat/ledger/global_constants.h"
 #include "bat/ledger/internal/uphold/uphold_util.h"
@@ -50,27 +49,6 @@ std::string GetFeeAddress() {
       : kFeeAddressStaging;
 }
 
-std::string ConvertToProbi(const std::string& amount) {
-  if (amount.empty()) {
-    return "0";
-  }
-
-  auto vec = base::SplitString(
-      amount, ".", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
-
-  const std::string probi = "000000000000000000";
-
-  if (vec.size() == 1) {
-    return vec.at(0) + probi;
-  }
-
-  const auto before_dot = vec.at(0);
-  const auto after_dot = vec.at(1);
-  const auto rest_probi = probi.substr(after_dot.size());
-
-  return before_dot + after_dot + rest_probi;
-}
-
 std::string GetVerifyUrl(const std::string& state) {
   const std::string id = GetClientId();
 
@@ -78,9 +56,17 @@ std::string GetVerifyUrl(const std::string& state) {
 
   return base::StringPrintf(
       "%s/authorize/%s"
-      "?scope=cards:read cards:write user:read transactions:read "
+      "?scope="
+      "accounts:read "
+      "accounts:write "
+      "cards:read "
+      "cards:write "
+      "user:read "
+      "transactions:deposit "
+      "transactions:read "
       "transactions:transfer:application "
-      "transactions:transfer:others&intention=kyc&"
+      "transactions:transfer:others"
+      "&intention=kyc&"
       "state=%s",
       url.c_str(),
       id.c_str(),
@@ -217,10 +203,7 @@ std::string GenerateVerifyLink(ledger::ExternalWalletPtr wallet) {
   }
 
   switch (wallet->status) {
-    case ledger::WalletStatus::PENDING: {
-      url = GetSecondStepVerify();
-      break;
-    }
+    case ledger::WalletStatus::PENDING:
     case ledger::WalletStatus::CONNECTED: {
       url = GetSecondStepVerify();
       break;

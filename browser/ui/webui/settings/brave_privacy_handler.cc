@@ -9,19 +9,42 @@
 
 #include "base/bind.h"
 #include "base/values.h"
-#include "brave/components/p3a/pref_names.h"
+#include "brave/common/pref_names.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/pref_names.h"
 #include "components/gcm_driver/gcm_buildflags.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/web_ui.h"
-#include "content/public/common/webrtc_ip_handling_policy.h"
 #include "content/public/browser/web_ui_data_source.h"
+#include "third_party/blink/public/common/peerconnection/webrtc_ip_handling_policy.h"
 
 #if !BUILDFLAG(USE_GCM_FROM_PLATFORM)
 #include "brave/browser/gcm_driver/brave_gcm_channel_status.h"
 #endif
+
+#if BUILDFLAG(BRAVE_P3A_ENABLED)
+#include "brave/components/p3a/pref_names.h"
+#endif
+
+BravePrivacyHandler::BravePrivacyHandler() {
+  local_state_change_registrar_.Init(g_browser_process->local_state());
+  local_state_change_registrar_.Add(
+      kRemoteDebuggingEnabled,
+      base::Bind(&BravePrivacyHandler::OnRemoteDebuggingEnabledChanged,
+                 base::Unretained(this)));
+
+#if BUILDFLAG(BRAVE_P3A_ENABLED)
+  local_state_change_registrar_.Add(
+      brave::kP3AEnabled,
+      base::Bind(&BravePrivacyHandler::OnP3AEnabledChanged,
+                 base::Unretained(this)));
+#endif
+}
+
+BravePrivacyHandler::~BravePrivacyHandler() {
+  local_state_change_registrar_.RemoveAll();
+}
 
 void BravePrivacyHandler::RegisterMessages() {
   profile_ = Profile::FromWebUI(web_ui());
@@ -34,12 +57,24 @@ void BravePrivacyHandler::RegisterMessages() {
       "setWebRTCPolicy",
       base::BindRepeating(&BravePrivacyHandler::SetWebRTCPolicy,
                           base::Unretained(this)));
+
+#if BUILDFLAG(BRAVE_P3A_ENABLED)
   web_ui()->RegisterMessageCallback(
       "setP3AEnabled", base::BindRepeating(&BravePrivacyHandler::SetP3AEnabled,
                                            base::Unretained(this)));
   web_ui()->RegisterMessageCallback(
       "getP3AEnabled", base::BindRepeating(&BravePrivacyHandler::GetP3AEnabled,
                                            base::Unretained(this)));
+#endif
+
+  web_ui()->RegisterMessageCallback(
+      "setRemoteDebuggingEnabled",
+      base::BindRepeating(&BravePrivacyHandler::SetRemoteDebuggingEnabled,
+                          base::Unretained(this)));
+  web_ui()->RegisterMessageCallback(
+      "getRemoteDebuggingEnabled",
+      base::BindRepeating(&BravePrivacyHandler::GetRemoteDebuggingEnabled,
+                          base::Unretained(this)));
 }
 
 // static
@@ -78,6 +113,7 @@ void BravePrivacyHandler::GetWebRTCPolicy(const base::ListValue* args) {
   ResolveJavascriptCallback(args->GetList()[0].Clone(), base::Value(policy));
 }
 
+#if BUILDFLAG(BRAVE_P3A_ENABLED)
 void BravePrivacyHandler::SetP3AEnabled(const base::ListValue* args) {
   CHECK_EQ(args->GetSize(), 1U);
 
@@ -96,4 +132,45 @@ void BravePrivacyHandler::GetP3AEnabled(const base::ListValue* args) {
 
   AllowJavascript();
   ResolveJavascriptCallback(args->GetList()[0].Clone(), base::Value(enabled));
+}
+
+void BravePrivacyHandler::OnP3AEnabledChanged() {
+  if (IsJavascriptAllowed()) {
+    PrefService* local_state = g_browser_process->local_state();
+    bool enabled = local_state->GetBoolean(brave::kP3AEnabled);
+
+    FireWebUIListener("p3a-enabled-changed", base::Value(enabled));
+  }
+}
+#endif
+
+void BravePrivacyHandler::SetRemoteDebuggingEnabled(
+    const base::ListValue* args) {
+  CHECK_EQ(args->GetSize(), 1U);
+
+  bool enabled;
+  args->GetBoolean(0, &enabled);
+
+  PrefService* local_state = g_browser_process->local_state();
+  local_state->SetBoolean(kRemoteDebuggingEnabled, enabled);
+}
+
+void BravePrivacyHandler::GetRemoteDebuggingEnabled(
+    const base::ListValue* args) {
+  CHECK_EQ(args->GetSize(), 1U);
+
+  PrefService* local_state = g_browser_process->local_state();
+  bool enabled = local_state->GetBoolean(kRemoteDebuggingEnabled);
+
+  AllowJavascript();
+  ResolveJavascriptCallback(args->GetList()[0].Clone(), base::Value(enabled));
+}
+
+void BravePrivacyHandler::OnRemoteDebuggingEnabledChanged() {
+  if (IsJavascriptAllowed()) {
+    PrefService* local_state = g_browser_process->local_state();
+    bool enabled = local_state->GetBoolean(kRemoteDebuggingEnabled);
+
+    FireWebUIListener("remote-debugging-enabled-changed", base::Value(enabled));
+  }
 }

@@ -7,10 +7,9 @@
 #define BRAVE_BROWSER_BRAVE_DRM_TAB_HELPER_H_
 
 #include "brave/components/brave_drm/brave_drm.mojom.h"
-#include "content/public/browser/web_contents_binding_set.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "content/public/browser/web_contents_receiver_set.h"
 #include "content/public/browser/web_contents_user_data.h"
-#include "third_party/widevine/cdm/buildflags.h"
 
 // Reacts to DRM content detected on the renderer side.
 class BraveDrmTabHelper final
@@ -33,14 +32,12 @@ class BraveDrmTabHelper final
   WEB_CONTENTS_USER_DATA_KEY_DECL();
 
  private:
-  content::WebContentsFrameBindingSet<brave_drm::mojom::BraveDRM> bindings_;
+  content::WebContentsFrameReceiverSet<brave_drm::mojom::BraveDRM> receivers_;
 
-#if BUILDFLAG(ENABLE_WIDEVINE_CDM_COMPONENT) || BUILDFLAG(BUNDLE_WIDEVINE_CDM)
   // Permission request is done only once during the navigation. If user
   // chooses dismiss/deny, additional request is added again only when new
   // main frame navigation is started.
   bool is_permission_requested_ = false;
-#endif
 
   // True if we are notified that a page requested widevine availability.
   bool is_widevine_requested_ = false;

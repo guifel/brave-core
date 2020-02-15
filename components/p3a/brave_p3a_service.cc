@@ -43,29 +43,32 @@ constexpr char kLastRotationTimeStampPref[] = "p3a.last_rotation_timestamp";
 
 constexpr char kDefaultUploadServerUrl[] = "https://p3a.brave.com/";
 
-constexpr uint64_t kDefaultUploadIntervalSeconds = 60 * 60;  // 1 hour.
+constexpr uint64_t kDefaultUploadIntervalSeconds = 60;  // 1 minute.
 
 // TODO(iefremov): Provide moar histograms!
 // Whitelist for histograms that we collect. Will be replaced with something
 // updating on the fly.
 constexpr const char* kCollectedHistograms[] = {
     "Brave.P3A.SentAnswersCount",
+    "Brave.Savings.BandwidthSavingsMB",
     "Brave.Sync.Status",
-    "DefaultBrowser.State",
+    // Deprecated:
+    // "DefaultBrowser.State",
     "Brave.Importer.ImporterSource",
     "Brave.Shields.UsageStatus",
     // Do not gather detailed info regarding TOR usage for now.
     // "Brave.Core.LastTimeTorUsed",
+    "Brave.Core.IsDefault",
     "Brave.Core.TorEverUsed",
     "Brave.Core.LastTimeIncognitoUsed",
     "Brave.Core.NumberOfExtensions",
     "Brave.Core.BookmarksCountOnProfileLoad",
     "Brave.Core.TabCount",
     "Brave.Core.WindowCount",
-    "Brave.Rewards.WalletBalance",
-    "Brave.Rewards.AutoContributionsState",
-    "Brave.Rewards.TipsState",
-    "Brave.Rewards.AdsState",
+    "Brave.Rewards.WalletBalance.2",
+    "Brave.Rewards.AutoContributionsState.2",
+    "Brave.Rewards.TipsState.2",
+    "Brave.Rewards.AdsState.2",
     "Brave.Uptime.BrowserOpenMinutes",
     "Brave.Welcome.InteractionStatus",
 };
@@ -205,6 +208,14 @@ std::string BraveP3AService::Serialize(base::StringPiece histogram_name,
   return message.SerializeAsString();
 }
 
+bool
+BraveP3AService::IsActualMetric(base::StringPiece histogram_name) const {
+  static const base::NoDestructor<base::flat_set<base::StringPiece>>
+      metric_names {std::begin(kCollectedHistograms),
+                    std::end(kCollectedHistograms)};
+  return metric_names->contains(histogram_name);
+}
+
 void BraveP3AService::MaybeOverrideSettingsFromCommandLine() {
   base::CommandLine* cmdline = base::CommandLine::ForCurrentProcess();
 
@@ -305,10 +316,9 @@ void BraveP3AService::OnHistogramChanged(base::StringPiece histogram_name,
     return;
   }
 
-  base::PostTaskWithTraits(
-      FROM_HERE, {content::BrowserThread::UI},
-      base::BindOnce(&BraveP3AService::OnHistogramChangedOnUI, this,
-                     histogram_name, sample, bucket));
+  base::PostTask(FROM_HERE, {content::BrowserThread::UI},
+                 base::BindOnce(&BraveP3AService::OnHistogramChangedOnUI, this,
+                                histogram_name, sample, bucket));
 }
 
 void BraveP3AService::OnHistogramChangedOnUI(base::StringPiece histogram_name,

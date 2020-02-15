@@ -1,12 +1,12 @@
 diff --git a/net/BUILD.gn b/net/BUILD.gn
-index 43274b172b2df9e36852e7eec8d4b99b0fa85309..9ca7620e8fb6e06a985f5fd426689dc885f9c5c7 100644
+index 34a223c59e720747c98448b48c421d21ca73702f..fa2c2dc08c97251620311e1d464c33c702df2215 100644
 --- a/net/BUILD.gn
 +++ b/net/BUILD.gn
-@@ -1892,6 +1892,7 @@ component("net") {
+@@ -1760,6 +1760,7 @@ component("net") {
          "reporting/reporting_uploader.h",
        ]
      }
 +    sources += brave_net_sources
  
-     if (!use_kerberos) {
-       sources -= [
+     if (is_android) {
+       sources += [

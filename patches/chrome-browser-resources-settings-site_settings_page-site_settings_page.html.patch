@@ -1,11 +1,11 @@
 diff --git a/chrome/browser/resources/settings/site_settings_page/site_settings_page.html b/chrome/browser/resources/settings/site_settings_page/site_settings_page.html
-index a2adc7f829b87258fc6dab8443b6068f0fd4b8a7..7fd8ce11fdd60148931e2156ab7a81a9fdfd4b5a 100644
+index 38688df76d80161df13fdbc588cd52277c8c2b61..f82cdbcc1b83abf6a39c3eee5beff14c164054e5 100644
 --- a/chrome/browser/resources/settings/site_settings_page/site_settings_page.html
 +++ b/chrome/browser/resources/settings/site_settings_page/site_settings_page.html
-@@ -81,7 +81,18 @@
-             default_.notifications,
+@@ -88,7 +88,18 @@
              '$i18nPolymer{siteSettingsAskBeforeSending}',
-             '$i18nPolymer{siteSettingsBlocked}')]]"></cr-link-row>
+             '$i18nPolymer{siteSettingsBlocked}')]]"
+         role-description="$i18n{subpageArrowRoleDescription}"></cr-link-row>
 -
 +    <cr-link-row
 +        class="hr two-line"
@@ -22,19 +22,19 @@ index a2adc7f829b87258fc6dab8443b6068f0fd4b8a7..7fd8ce11fdd60148931e2156ab7a81a9
      <cr-link-row class="hr two-line" data-route="SITE_SETTINGS_JAVASCRIPT"
          id="javascript" label="$i18n{siteSettingsJavascript}"
          on-click="onTapNavigate_" start-icon="settings:code"
-@@ -113,7 +124,7 @@
-             default_.popups,
+@@ -124,7 +135,7 @@
              '$i18nPolymer{siteSettingsAllowed}',
-             '$i18nPolymer{siteSettingsBlocked}')]]"></cr-link-row>
+             '$i18nPolymer{siteSettingsBlocked}')]]"
+         role-description="$i18n{subpageArrowRoleDescription}"></cr-link-row>
 -
 +<!--
      <template is="dom-if" if="[[enableSafeBrowsingSubresourceFilter_]]">
        <cr-link-row class="hr two-line" data-route="SITE_SETTINGS_ADS" id="ads"
            label="$i18n{siteSettingsAds}" on-click="onTapNavigate_"
-@@ -131,7 +142,7 @@
-             default_.backgroundSync,
+@@ -144,7 +155,7 @@
              '$i18nPolymer{siteSettingsAllowRecentlyClosedSites}',
-             '$i18nPolymer{siteSettingsBackgroundSyncBlocked}')]]"></cr-link-row>
+             '$i18nPolymer{siteSettingsBackgroundSyncBlocked}')]]"
+         role-description="$i18n{subpageArrowRoleDescription}"></cr-link-row>
 -
 +-->
      <cr-link-row class="hr two-line" data-route="SITE_SETTINGS_SOUND"

@@ -6,19 +6,18 @@
 #include <map>
 
 #include "base/files/scoped_temp_dir.h"
-#include "extensions/browser/test_event_router.h"
 #include "brave/components/brave_ads/browser/ads_service.h"
 #include "brave/components/brave_ads/browser/ads_service_factory.h"
-#include "brave/components/brave_rewards/browser/rewards_service_factory.h"
-#include "brave/components/brave_rewards/browser/rewards_service.h"
-#include "brave/components/brave_rewards/browser/rewards_service_private_observer.h"
 #include "brave/components/brave_ads/browser/test_util.h"
+#include "brave/components/brave_rewards/browser/rewards_service.h"
+#include "brave/components/brave_rewards/browser/rewards_service_factory.h"
+#include "brave/components/brave_rewards/browser/rewards_service_private_observer.h"
+#include "brave/components/brave_rewards/common/pref_names.h"
 #include "chrome/browser/profiles/profile.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/test/browser_task_environment.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
-#include "brave/components/brave_rewards/common/pref_names.h"
-#include "components/prefs/pref_service.h"
 
 // npm run test -- brave_unit_tests --filter=AdsServiceTest.*
 
@@ -46,14 +45,16 @@ class MockRewardsService : public RewardsService {
            uint32_t,
            bool,
            const brave_rewards::GetContentSiteListCallback&));
-  MOCK_METHOD2(FetchGrants, void(const std::string&, const std::string&));
-  MOCK_METHOD2(GetGrantCaptcha, void(const std::string&, const std::string&));
-  MOCK_CONST_METHOD2(SolveGrantCaptcha, void(const std::string&,
-                                             const std::string&));
+  MOCK_METHOD0(FetchPromotions, void());
+  MOCK_METHOD1(ClaimPromotion, void(brave_rewards::ClaimPromotionCallback));
+  MOCK_METHOD2(ClaimPromotion, void(const std::string&,
+      brave_rewards::AttestPromotionCallback));
+  MOCK_METHOD3(AttestPromotion, void(const std::string&,
+      const std::string&,
+      brave_rewards::AttestPromotionCallback));
   MOCK_METHOD1(GetWalletPassphrase,
       void(const brave_rewards::GetWalletPassphraseCallback&));
   MOCK_METHOD1(RecoverWallet, void(const std::string&));
-  MOCK_CONST_METHOD1(GetGrantViaSafetynetCheck, void(const std::string&));
   MOCK_METHOD0(RestorePublishersUI, void());
   MOCK_METHOD2(OnLoad, void(SessionID, const GURL&));
   MOCK_METHOD1(OnUnload, void(SessionID));
@@ -92,9 +93,6 @@ class MockRewardsService : public RewardsService {
   MOCK_METHOD1(SetAutoContribute, void(bool));
   MOCK_CONST_METHOD0(UpdateAdsRewards, void());
   MOCK_METHOD2(SetTimer, void(uint64_t, uint32_t*));
-  MOCK_METHOD1(GetAllBalanceReports,
-      void(const brave_rewards::GetAllBalanceReportsCallback&));
-  MOCK_METHOD0(GetCurrentBalanceReport, void());
   MOCK_METHOD1(IsWalletCreated,
       void(const brave_rewards::IsWalletCreatedCallback&));
   MOCK_METHOD4(GetPublisherActivityFromUrl, void(uint64_t,
@@ -107,10 +105,10 @@ class MockRewardsService : public RewardsService {
       void(const std::string&,
            brave_rewards::GetPublisherBannerCallback));
   MOCK_METHOD3(OnTip, void(const std::string&,
-                           int,
+                           double,
                            bool));
   MOCK_METHOD4(OnTip, void(const std::string&,
-                           int,
+                           double,
                            bool,
                            std::unique_ptr<brave_rewards::ContentSite>));
   MOCK_METHOD1(RemoveRecurringTipUI, void(const std::string&));
@@ -140,7 +138,7 @@ class MockRewardsService : public RewardsService {
       void(brave_rewards::GetTransactionHistoryCallback));
   MOCK_METHOD3(SaveRecurringTipUI,
       void(const std::string&,
-           const int,
+           const double,
            brave_rewards::SaveRecurringTipCallback));
   MOCK_METHOD2(RefreshPublisher, void(const std::string&,
                                       brave_rewards::RefreshPublisherCallback));
@@ -162,9 +160,7 @@ class MockRewardsService : public RewardsService {
                   brave_rewards::GetShareURLCallback callback));
   MOCK_METHOD1(GetPendingContributionsUI,
       void(brave_rewards::GetPendingContributionsCallback));
-  MOCK_METHOD3(RemovePendingContributionUI, void(const std::string&,
-                                                 const std::string&,
-                                                 uint64_t));
+  MOCK_METHOD1(RemovePendingContributionUI, void(const uint64_t));
   MOCK_METHOD0(RemoveAllPendingContributionsUI, void());
 
   MOCK_METHOD1(GetPendingContributionsTotalUI, void(
@@ -196,6 +192,19 @@ class MockRewardsService : public RewardsService {
       void(RewardsServicePrivateObserver* observer));
   MOCK_METHOD1(ResetTheWholeState,
       void(const base::Callback<void(bool)>& callback));
+
+  MOCK_METHOD1(GetAnonWalletStatus,
+      void(brave_rewards::GetAnonWalletStatusCallback callback));
+
+  MOCK_METHOD3(GetBalanceReport, void(
+      const uint32_t month,
+      const uint32_t year,
+      brave_rewards::GetBalanceReportCallback callback));
+
+  MOCK_METHOD3(GetMonthlyReport, void(
+      const uint32_t month,
+      const uint32_t year,
+      brave_rewards::GetMonthlyReportCallback callback));
 };
 
 class AdsServiceTest : public testing::Test {
@@ -228,7 +237,7 @@ class AdsServiceTest : public testing::Test {
   MockRewardsService* rewards_service() { return rewards_service_; }
 
  private:
-  content::TestBrowserThreadBundle thread_bundle_;
+  content::BrowserTaskEnvironment task_environment_;
   std::unique_ptr<Profile> profile_;
   base::ScopedTempDir temp_dir_;
   MockRewardsService* rewards_service_;

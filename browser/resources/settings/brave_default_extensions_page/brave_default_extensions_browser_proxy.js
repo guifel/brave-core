@@ -12,7 +12,11 @@ cr.define('settings', function() {
     setBraveWalletEnabled(value) {}
     setHangoutsEnabled(value) {}
     setIPFSCompanionEnabled(value) {}
+    setTorEnabled(value) {}
+    isTorEnabled() {}
+    isTorManaged() {}
     getRestartNeeded() {}
+    getWeb3ProviderList() {}
   }
 
   /**
@@ -35,8 +39,21 @@ cr.define('settings', function() {
     setMediaRouterEnabled(value) {
       chrome.send('setMediaRouterEnabled', [value]);
     }
+    setTorEnabled(value) {
+      chrome.send('setTorEnabled', [value]);
+    }
+    isTorEnabled() {
+      return cr.sendWithPromise('isTorEnabled');
+    }
+    isTorManaged() {
+      return cr.sendWithPromise('isTorManaged');
+    }
     getRestartNeeded() {
       return cr.sendWithPromise('getRestartNeeded');
+    }
+    /** @override */
+    getWeb3ProviderList() {
+      return new Promise(resolve => chrome.braveWallet.getWeb3ProviderList(resolve))
     }
   }
 

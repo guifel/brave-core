@@ -46,21 +46,24 @@ class RewardsNotificationServiceImpl
   bool Exists(RewardsNotificationID id) const override;
 
  private:
-  bool IsUGPGrant(const std::string& grant_type);
-  std::string GetGrantIdPrefix(const std::string& grant_type);
+  bool IsAds(const uint32_t promotion_type);
+  std::string GetPromotionIdPrefix(const uint32_t promotion_type);
 
   // RewardsServiceObserver impl
-  void OnGrant(RewardsService* rewards_service,
-               unsigned int result,
-               Grant properties) override;
-  void OnGrantFinish(RewardsService* rewards_service,
-                     unsigned int result,
-                     brave_rewards::Grant grant) override;
-  void OnReconcileComplete(RewardsService* rewards_service,
-                           unsigned int result,
-                           const std::string& viewing_id,
-                           const std::string& probi,
-                           const int32_t type) override;
+  void OnFetchPromotions(
+      RewardsService* rewards_service,
+      const uint32_t result,
+      const std::vector<Promotion>& list) override;
+  void OnPromotionFinished(
+      RewardsService* rewards_service,
+      const uint32_t result,
+      Promotion promotion) override;
+  void OnReconcileComplete(
+      RewardsService* rewards_service,
+      unsigned int result,
+      const std::string& viewing_id,
+      const double amount,
+      const int32_t type) override;
 
   void TriggerOnNotificationAdded(
       const RewardsNotification& rewards_notification);

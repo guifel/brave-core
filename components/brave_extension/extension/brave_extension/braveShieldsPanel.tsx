@@ -7,12 +7,12 @@ import * as ReactDOM from 'react-dom'
 import shieldsDarkTheme from './theme/shields-dark'
 import shieldsLightTheme from './theme/shields-light'
 import { Provider } from 'react-redux'
-import { Store } from 'react-chrome-redux'
+import { Store } from 'webext-redux'
 import BraveCoreThemeProvider from '../../../common/BraveCoreThemeProvider'
 import BraveShields from './containers/app'
 import { getViewPreferences } from './background/api/shieldsAPI'
-require('../../../fonts/muli.css')
-require('../../../fonts/poppins.css')
+require('../../../../ui/webui/resources/fonts/muli.css')
+require('../../../../ui/webui/resources/fonts/poppins.css')
 
 const store: any = new Store({
   portName: 'BRAVE'

@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/profiles/profile.cc b/chrome/browser/profiles/profile.cc
-index 56058d9ee424840d1b98ecfee42c656413c49542..e3de78cd2ff55e1db8f54d7c82ab97390dce674a 100644
+index 2b1140fdd27ec6298eba58c0100f53e3eae2415f..abf009bf923ea55b952a32df160870c3899c91a8 100644
 --- a/chrome/browser/profiles/profile.cc
 +++ b/chrome/browser/profiles/profile.cc
-@@ -140,7 +140,7 @@ const char Profile::kProfileKey[] = "__PROFILE__";
+@@ -149,7 +149,7 @@ const char Profile::kProfileKey[] = "__PROFILE__";
  void Profile::RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
    registry->RegisterBooleanPref(
        prefs::kSearchSuggestEnabled,

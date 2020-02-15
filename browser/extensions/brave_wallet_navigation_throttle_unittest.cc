@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/environment.h"
 #include "brave/browser/profiles/brave_profile_manager.h"
 #include "brave/browser/profiles/profile_util.h"
 #include "brave/browser/profiles/tor_unittest_profile_manager.h"
@@ -80,6 +81,12 @@ class BraveWalletNavigationThrottleUnitTest
 #endif
     original_client_ = content::SetBrowserClientForTesting(&client_);
     content::RenderViewHostTestHarness::SetUp();
+
+    // For debug builds, set a fake BRAVE_INFURA_PROJECT_ID env var
+    std::unique_ptr<base::Environment> env(base::Environment::Create());
+    if (!env->HasVar("BRAVE_INFURA_PROJECT_ID")) {
+      env->SetVar("BRAVE_INFURA_PROJECT_ID", "test_project_id");
+    }
   }
 
   std::unique_ptr<content::BrowserContext> CreateBrowserContext() override {
@@ -189,21 +196,6 @@ TEST_F(BraveWalletNavigationThrottleUnitTest, ChromeWalletUrlInstalled) {
   auto throttle = std::make_unique<BraveWalletNavigationThrottle>(&test_handle);
   EXPECT_EQ(NavigationThrottle::PROCEED, throttle->WillStartRequest().action())
       << url;
-}
-
-// Tests the case of loading brave://wallet when the Wallet is explicitly
-// disabled.
-TEST_F(BraveWalletNavigationThrottleUnitTest, ChromeWalletDisabledByPref) {
-  profile()->GetPrefs()->SetBoolean(kBraveWalletEnabled, false);
-  web_contents_tester()->NavigateAndCommit(GURL("http://example.com"));
-  content::RenderFrameHost* host =
-      render_frame_host_tester(main_rfh())->AppendChild("child");
-  GURL url("chrome://wallet");
-  content::MockNavigationHandle test_handle(url, host);
-  test_handle.set_starting_site_instance(host->GetSiteInstance());
-  auto throttle = std::make_unique<BraveWalletNavigationThrottle>(&test_handle);
-  EXPECT_EQ(NavigationThrottle::BLOCK_REQUEST,
-      throttle->WillStartRequest().action()) << url;
 }
 
 #if BUILDFLAG(ENABLE_TOR)

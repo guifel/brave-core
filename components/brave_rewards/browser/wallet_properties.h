@@ -9,7 +9,6 @@
 #include <string>
 #include <map>
 #include <vector>
-#include "brave/components/brave_rewards/browser/grant.h"
 
 namespace brave_rewards {
 
@@ -20,7 +19,8 @@ struct WalletProperties {
 
   double monthly_amount;
   std::vector<double> parameters_choices;
-  std::vector<Grant> grants;
+  std::vector<double> default_tip_choices;
+  std::vector<double> default_monthly_tip_choices;
 };
 
 }  // namespace brave_rewards

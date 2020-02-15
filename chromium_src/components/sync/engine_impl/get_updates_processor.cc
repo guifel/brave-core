@@ -29,7 +29,7 @@ SyncerError ApplyBraveRecords(sync_pb::ClientToServerResponse*,
 #include "components/sync/base/system_encryptor.h"
 #include "components/sync/base/time.h"
 #include "components/sync/engine_impl/loopback_server/loopback_server_entity.h"
-#include "components/sync/nigori/cryptographer.h"
+#include "components/sync/syncable/directory_cryptographer.h"
 #include "components/sync/syncable/syncable_proto_util.h"
 #include "url/gurl.h"
 
@@ -59,7 +59,6 @@ void AddBookmarkSpecifics(sync_pb::EntitySpecifics* specifics,
   bm_specifics->set_title(bookmark.site.TryGetNonEmptyTitle());
   bm_specifics->set_creation_time_us(
       TimeToProtoTime(bookmark.site.creationTime));
-  bm_specifics->set_icon_url(bookmark.site.favicon);
   // base::Time::Now().ToDeltaSinceWindowsEpoch().InMicroseconds());
   sync_pb::MetaInfo* meta_info = bm_specifics->add_meta_info();
   meta_info->set_key("order");
@@ -87,11 +86,7 @@ void ExtractBookmarkMeta(sync_pb::SyncEntity* entity,
       meta_info->set_key(metaInfo.key);
       meta_info->set_value(metaInfo.value);
     }
-    if (metaInfo.key == "originator_cache_guid") {
-      entity->set_originator_cache_guid(metaInfo.value);
-    } else if (metaInfo.key == "originator_client_item_id") {
-      entity->set_originator_client_item_id(metaInfo.value);
-    } else if (metaInfo.key == "version") {
+    if (metaInfo.key == "version") {
       int64_t version;
       bool result = base::StringToInt64(metaInfo.value, &version);
       DCHECK(result);
@@ -110,12 +105,6 @@ void ExtractBookmarkMeta(sync_pb::SyncEntity* entity,
 }
 
 void MigrateFromLegacySync(sync_pb::SyncEntity* entity) {
-  if (!entity->has_originator_cache_guid()) {
-    entity->set_originator_cache_guid("legacy_originator_cache_guid");
-  }
-  if (!entity->has_originator_client_item_id()) {
-    entity->set_originator_client_item_id(base::GenerateGUID());
-  }
   if (!entity->has_position_in_parent()) {
     entity->set_position_in_parent(0);
   }
@@ -220,7 +209,7 @@ void ConstructUpdateResponse(sync_pb::GetUpdatesResponse* gu_response,
       sync_pb::NigoriSpecifics* nigori = specifics.mutable_nigori();
       nigori->set_encrypt_everything(false);
       nigori->set_encrypt_bookmarks(false);
-      syncer::Cryptographer cryptographer;
+      syncer::DirectoryCryptographer cryptographer;
       KeyParams params = {KeyDerivationParams::CreateForPbkdf2(), "foobar"};
       syncer::KeyDerivationMethod method = params.derivation_params.method();
       bool add_key_result = cryptographer.AddKey(params);

@@ -33,11 +33,8 @@ class LedgerClientMojoProxy : public mojom::BatLedgerClient,
   void OnReconcileComplete(
       const ledger::Result result,
       const std::string& viewing_id,
-      const std::string& probi,
+      const double amount,
       const ledger::RewardsType type) override;
-  void OnGrantFinish(
-    const ledger::Result result,
-    ledger::GrantPtr grant) override;
 
   void LoadPublisherState(LoadPublisherStateCallback callback) override;
   void SaveLedgerState(const std::string& ledger_state,
@@ -57,7 +54,7 @@ class LedgerClientMojoProxy : public mojom::BatLedgerClient,
   void FetchFavIcon(const std::string& url, const std::string& favicon_key,
       FetchFavIconCallback callback) override;
   void SaveRecurringTip(
-      ledger::ContributionInfoPtr info,
+      ledger::RecurringTipPtr info,
       SaveRecurringTipCallback callback) override;
   void GetRecurringTips(GetRecurringTipsCallback callback) override;
 
@@ -74,13 +71,11 @@ class LedgerClientMojoProxy : public mojom::BatLedgerClient,
       const ledger::Result result,
       ledger::PublisherInfoPtr info,
       uint64_t window_id) override;
+
   void SaveContributionInfo(
-      const std::string& probi,
-      ledger::ActivityMonth month,
-      int32_t year,
-      uint32_t date,
-      const std::string& publisher_key,
-      const ledger::RewardsType type) override;
+      ledger::ContributionInfoPtr info,
+      SaveContributionInfoCallback callback) override;
+
   void SaveMediaPublisherInfo(const std::string& media_key,
       const std::string& publisher_id) override;
 
@@ -164,16 +159,12 @@ class LedgerClientMojoProxy : public mojom::BatLedgerClient,
   void SetConfirmationsIsReady(const bool is_ready) override;
 
   void ConfirmationsTransactionHistoryDidChange() override;
-  void OnGrantViaSafetynetCheck(
-      const std::string& promotion_id, const std::string& nonce) override;
 
   void GetPendingContributions(
       GetPendingContributionsCallback callback) override;
 
   void RemovePendingContribution(
-      const std::string& publisher_key,
-      const std::string& viewing_id,
-      uint64_t added_date,
+      const uint64_t id,
       RemovePendingContributionCallback callback) override;
 
   void RemoveAllPendingContributions(
@@ -231,6 +222,67 @@ class LedgerClientMojoProxy : public mojom::BatLedgerClient,
 
   void GetFirstContributionQueue(
     GetFirstContributionQueueCallback callback) override;
+
+  void InsertOrUpdatePromotion(
+    ledger::PromotionPtr info,
+    InsertOrUpdatePromotionCallback callback) override;
+
+  void GetPromotion(
+    const std::string& id,
+    GetPromotionCallback callback) override;
+
+  void GetAllPromotions(
+    GetAllPromotionsCallback callback) override;
+
+  void InsertOrUpdateUnblindedToken(
+    ledger::UnblindedTokenPtr info,
+    InsertOrUpdateUnblindedTokenCallback callback) override;
+
+  void GetAllUnblindedTokens(
+    GetAllUnblindedTokensCallback callback) override;
+
+  void DeleteUnblindedTokens(
+      const std::vector<std::string>& id_list,
+      DeleteUnblindedTokensCallback callback) override;
+
+  void DeleteUnblindedTokensForPromotion(
+      const std::string& promotion_id,
+      DeleteUnblindedTokensForPromotionCallback callback) override;
+
+  void GetClientInfo(
+      GetClientInfoCallback callback) override;
+
+  void UnblindedTokensReady() override;
+
+  void GetTransactionReport(
+      const ledger::ActivityMonth month,
+      const int year,
+      GetTransactionReportCallback callback) override;
+
+  void GetContributionReport(
+      const ledger::ActivityMonth month,
+      const int year,
+      GetContributionReportCallback callback) override;
+
+  void GetIncompleteContributions(
+      GetIncompleteContributionsCallback callback) override;
+
+  void GetContributionInfo(
+      const std::string& contribution_id,
+      GetContributionInfoCallback callback) override;
+
+  void UpdateContributionInfoStepAndCount(
+      const std::string& contribution_id,
+      const ledger::ContributionStep step,
+      const int32_t retry_count,
+      UpdateContributionInfoStepAndCountCallback callback) override;
+
+  void UpdateContributionInfoContributedAmount(
+      const std::string& contribution_id,
+      const std::string& publisher_key,
+      UpdateContributionInfoContributedAmountCallback callback) override;
+
+  void ReconcileStampReset() override;
 
  private:
   // workaround to pass base::OnceCallback into std::bind
@@ -312,6 +364,10 @@ class LedgerClientMojoProxy : public mojom::BatLedgerClient,
 
   static void OnRemoveRecurringTip(
       CallbackHolder<RemoveRecurringTipCallback>* holder,
+      const ledger::Result result);
+
+  static void OnSaveContributionInfo(
+      CallbackHolder<SaveContributionInfoCallback>* holder,
       const ledger::Result result);
 
   static void OnLoadURL(
@@ -411,6 +467,58 @@ class LedgerClientMojoProxy : public mojom::BatLedgerClient,
   static void OnGetFirstContributionQueue(
     CallbackHolder<GetFirstContributionQueueCallback>* holder,
     ledger::ContributionQueuePtr info);
+
+  static void OnInsertOrUpdatePromotion(
+    CallbackHolder<InsertOrUpdatePromotionCallback>* holder,
+    const ledger::Result result);
+
+  static void OnGetPromotion(
+    CallbackHolder<GetPromotionCallback>* holder,
+    ledger::PromotionPtr info);
+
+  static void OnGetAllPromotions(
+      CallbackHolder<GetAllPromotionsCallback>* holder,
+     ledger::PromotionMap promotions);
+
+  static void OnInsertOrUpdateUnblindedToken(
+    CallbackHolder<InsertOrUpdateUnblindedTokenCallback>* holder,
+    const ledger::Result result);
+
+  static void OnGetAllUnblindedTokens(
+    CallbackHolder<GetAllUnblindedTokensCallback>* holder,
+    ledger::UnblindedTokenList list);
+
+  static void OnDeleteUnblindedToken(
+    CallbackHolder<DeleteUnblindedTokensCallback>* holder,
+    const ledger::Result result);
+
+  static void OnDeleteUnblindedTokensForPromotion(
+      CallbackHolder<DeleteUnblindedTokensForPromotionCallback>* holder,
+      const ledger::Result result);
+
+  static void OnGetTransactionReport(
+      CallbackHolder<GetTransactionReportCallback>* holder,
+      ledger::TransactionReportInfoList list);
+
+  static void OnGetContributionReport(
+      CallbackHolder<GetContributionReportCallback>* holder,
+      ledger::ContributionReportInfoList list);
+
+  static void OnGetNotCompletedContributions(
+      CallbackHolder<GetIncompleteContributionsCallback>* holder,
+      ledger::ContributionInfoList list);
+
+  static void OnGetContributionInfo(
+      CallbackHolder<GetContributionInfoCallback>* holder,
+      ledger::ContributionInfoPtr info);
+
+  static void OnUpdateContributionInfoStepAndCount(
+      CallbackHolder<UpdateContributionInfoStepAndCountCallback>* holder,
+      const ledger::Result result);
+
+  static void OnUpdateContributionInfoContributedAmount(
+      CallbackHolder<UpdateContributionInfoContributedAmountCallback>* holder,
+      const ledger::Result result);
 
   ledger::LedgerClient* ledger_client_;
 

@@ -7,6 +7,7 @@
 #include "base/scoped_observer.h"
 #include "brave/browser/infobars/crypto_wallets_infobar_delegate.h"
 #include "brave/common/brave_paths.h"
+#include "brave/common/brave_wallet_constants.h"
 #include "brave/common/extensions/extension_constants.h"
 #include "brave/common/pref_names.h"
 #include "chrome/browser/infobars/infobar_service.h"
@@ -101,8 +102,8 @@ class BraveWalletAPIBrowserTest : public InProcessBrowserTest,
     for (size_t i = 0; i < infobar_service->infobar_count(); i++) {
       InfoBarDelegate* delegate =
           infobar_service->infobar_at(i)->delegate();
-      if (delegate->GetIdentifier() == (InfoBarDelegate::InfoBarIdentifier)
-            CRYPTO_WALLETS_INFOBAR_DELEGATE) {
+      if (delegate->GetIdentifier() ==
+              InfoBarDelegate::CRYPTO_WALLETS_INFOBAR_DELEGATE) {
         ConfirmInfoBarDelegate* confirm_delegate =
             delegate->AsConfirmInfoBarDelegate();
         // Only the OK button should be present
@@ -118,8 +119,8 @@ class BraveWalletAPIBrowserTest : public InProcessBrowserTest,
     for (size_t i = 0; i < infobar_service->infobar_count(); i++) {
       InfoBarDelegate* delegate =
           infobar_service->infobar_at(i)->delegate();
-      if (delegate->GetIdentifier() == (InfoBarDelegate::InfoBarIdentifier)
-            CRYPTO_WALLETS_INFOBAR_DELEGATE) {
+      if (delegate->GetIdentifier() ==
+              InfoBarDelegate::CRYPTO_WALLETS_INFOBAR_DELEGATE) {
         ConfirmInfoBarDelegate* confirm_delegate =
             delegate->AsConfirmInfoBarDelegate();
         // Only the OK button should be present
@@ -148,8 +149,7 @@ class BraveWalletAPIBrowserTest : public InProcessBrowserTest,
   void OnInfoBarAdded(InfoBar* infobar) override {
     if (infobar_added_run_loop_ &&
         infobar->delegate()->GetIdentifier() ==
-            (InfoBarDelegate::InfoBarIdentifier)
-                CRYPTO_WALLETS_INFOBAR_DELEGATE) {
+            InfoBarDelegate::CRYPTO_WALLETS_INFOBAR_DELEGATE) {
       infobar_added_ = true;
       infobar_added_run_loop_->Quit();
     }
@@ -164,9 +164,10 @@ IN_PROC_BROWSER_TEST_F(BraveWalletAPIBrowserTest, DappDetectionTestAccept) {
   EXPECT_TRUE(
       NavigateToURLUntilLoadStop("a.com", "/dapp.html"));
   WaitForCryptoWalletsInfobarAdded();
-  // Pref for Wallet should still be enabled
-  ASSERT_TRUE(
-      browser()->profile()->GetPrefs()->GetBoolean(kBraveWalletEnabled));
+  // Pref for Wallet should still be ask by default
+  auto provider = static_cast<BraveWalletWeb3ProviderTypes>(
+      browser()->profile()->GetPrefs()->GetInteger(kBraveWalletWeb3Provider));
+  ASSERT_EQ(provider, BraveWalletWeb3ProviderTypes::ASK);
   CryptoWalletsInfoBarAccept(ConfirmInfoBarDelegate::BUTTON_OK);
   WaitForTabCount(2);
   RemoveInfoBarObserver(infobar_service);
@@ -200,9 +201,9 @@ IN_PROC_BROWSER_TEST_F(BraveWalletAPIBrowserTest,
   WaitForCryptoWalletsInfobarAdded();
   CryptoWalletsInfoBarCancel(ConfirmInfoBarDelegate::BUTTON_OK |
       ConfirmInfoBarDelegate::BUTTON_CANCEL);
-  // Pref for Wallet should not be enabled
-  ASSERT_FALSE(
-      browser()->profile()->GetPrefs()->GetBoolean(kBraveWalletEnabled));
+  auto provider = static_cast<BraveWalletWeb3ProviderTypes>(
+      browser()->profile()->GetPrefs()->GetInteger(kBraveWalletWeb3Provider));
+  ASSERT_EQ(provider, BraveWalletWeb3ProviderTypes::METAMASK);
   RemoveInfoBarObserver(infobar_service);
 }
 

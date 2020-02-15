@@ -16,6 +16,9 @@ import * as utils from '../utils'
 
 interface Props extends RewardsTip.ComponentProps {
   monthly: boolean
+  monthlyDate?: string
+  amount?: string
+  onlyAnonWallet?: boolean
   publisher: RewardsTip.Publisher
   tipComplete?: boolean
   onTweet: () => void
@@ -27,6 +30,7 @@ interface State {
 }
 
 class Banner extends React.Component<Props, State> {
+  readonly defaultTipAmounts = [1, 5, 10]
   constructor (props: Props) {
     super(props)
     this.state = {
@@ -51,12 +55,23 @@ class Banner extends React.Component<Props, State> {
   }
 
   generateAmounts = () => {
-    const { balance } = this.props.rewardsDonateData
+    const { monthly } = this.props
+    const { balance, walletInfo } = this.props.rewardsDonateData
 
-    let amounts = [1, 5, 10]
-    const amount = this.props.publisher.amounts
-    if (amount && amount.length) {
-      amounts = amount
+    const publisherAmounts = this.props.publisher.amounts
+
+    // Prefer the publisher amounts, then the wallet's defaults. Fall back to defaultTipAmounts.
+    let amounts = this.defaultTipAmounts
+    if (publisherAmounts && publisherAmounts.length) {
+      amounts = publisherAmounts
+    } else if (walletInfo) {
+      const walletAmounts = monthly
+        ? walletInfo.defaultMonthlyTipChoices
+        : walletInfo.defaultTipChoices
+
+      if (walletAmounts.length) {
+        amounts = walletAmounts
+      }
     }
 
     return amounts.map((value: number) => {
@@ -79,7 +94,7 @@ class Banner extends React.Component<Props, State> {
     const { total } = balance
     const publisher = this.props.publisher
 
-    if (publisher.publisherKey && total >= parseInt(amount, 10)) {
+    if (publisher.publisherKey && total >= parseFloat(amount)) {
       this.actions.onTip(publisher.publisherKey, amount, recurring)
     } else {
       // TODO return error
@@ -211,9 +226,8 @@ class Banner extends React.Component<Props, State> {
   render () {
     const { balance } = this.props.rewardsDonateData
     const { total } = balance
+    const { onlyAnonWallet, publisher, mediaMetaData, monthlyDate, amount } = this.props
 
-    const mediaMetaData = this.props.mediaMetaData
-    const publisher = this.props.publisher
     const checkmark = utils.isPublisherConnectedOrVerified(publisher.status)
     const bannerType = this.props.monthly ? 'monthly' : 'one-time'
     let logo = publisher.logo
@@ -230,6 +244,7 @@ class Banner extends React.Component<Props, State> {
     return (
       <SiteBanner
         type={bannerType}
+        onlyAnonWallet={onlyAnonWallet}
         domain={publisher.publisherKey}
         title={publisher.title}
         name={publisher.name}
@@ -252,6 +267,8 @@ class Banner extends React.Component<Props, State> {
         tipComplete={this.props.tipComplete}
         onTweet={this.props.onTweet}
         nextContribution={this.getNextContribution()}
+        monthlyDate={monthlyDate}
+        amount={amount}
       >
       {
         mediaMetaData

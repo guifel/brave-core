@@ -15,13 +15,21 @@ namespace extensions {
 
 namespace {
 
+#if !BUILDFLAG(OPTIMIZE_WEBUI)
+constexpr char kBraveGeneratedPath[] =
+    "@out_folder@/gen/brave/browser/resources/extensions/";
+#endif
+
 // Called from the original extension_ui.cc's CreateMdExtensionsSource via a
 // patch.
 void BraveAddExtensionsResources(content::WebUIDataSource* source) {
 #if !BUILDFLAG(OPTIMIZE_WEBUI)
   for (size_t i = 0; i < kBraveExtensionsResourcesSize; ++i) {
-    source->AddResourcePath(kBraveExtensionsResources[i].name,
-                            kBraveExtensionsResources[i].value);
+    std::string path = kBraveExtensionsResources[i].name;
+    if (path.rfind(kBraveGeneratedPath, 0) == 0) {
+      path = path.substr(strlen(kBraveGeneratedPath));
+    }
+    source->AddResourcePath(path, kBraveExtensionsResources[i].value);
   }
 #endif
   NavigationBarDataProvider::Initialize(source);
@@ -34,11 +42,11 @@ void BraveAddExtensionsResources(content::WebUIDataSource* source) {
 // These are defined in generated_resources.h, but since we are including it
 // here the original extensions_ui.cc shouldn't include it again and the
 // redefined values will be used.
-#undef IDS_MD_EXTENSIONS_ITEM_CHROME_WEB_STORE
-#define IDS_MD_EXTENSIONS_ITEM_CHROME_WEB_STORE \
-  IDS_MD_EXTENSIONS_BRAVE_ITEM_CHROME_WEB_STORE
-#undef IDS_MD_EXTENSIONS_ITEM_SOURCE_WEBSTORE
-#define IDS_MD_EXTENSIONS_ITEM_SOURCE_WEBSTORE \
-  IDS_MD_EXTENSIONS_BRAVE_ITEM_SOURCE_WEBSTORE
+#undef IDS_EXTENSIONS_ITEM_CHROME_WEB_STORE
+#define IDS_EXTENSIONS_ITEM_CHROME_WEB_STORE \
+  IDS_EXTENSIONS_BRAVE_ITEM_CHROME_WEB_STORE
+#undef IDS_EXTENSIONS_ITEM_SOURCE_WEBSTORE
+#define IDS_EXTENSIONS_ITEM_SOURCE_WEBSTORE \
+  IDS_EXTENSIONS_BRAVE_ITEM_SOURCE_WEBSTORE
 
 #include "../../../../../../chrome/browser/ui/webui/extensions/extensions_ui.cc"  // NOLINT

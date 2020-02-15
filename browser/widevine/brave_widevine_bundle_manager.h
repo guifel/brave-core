@@ -25,14 +25,9 @@ class FilePath;
 class SequencedTaskRunner;
 }
 
-namespace user_prefs {
-class PrefRegistrySyncable;
-}
-
 class BraveWidevineBundleManager {
  public:
   static char kWidevineInvalidVersion[];
-  static void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry);
 
   // Called when install process is finished.
   using DoneCallback = base::OnceCallback<void(const std::string& error)>;
@@ -97,6 +92,11 @@ class BraveWidevineBundleManager {
   void DoDelayedBackgroundUpdate();
   void ScheduleBackgroundUpdate();
   void OnBackgroundUpdateFinished(const std::string& error);
+
+  // Delete user-dir/WidevineCdm/libwidevinecdm.so if exists.
+  // After c79, libwidevinecdm.so is located under
+  // user-dir/WidevineCdm/_platform_specific/linux_x64/ and old one is not used.
+  void DeleteDeprecatedWidevineCdmLib();
 
   scoped_refptr<base::SequencedTaskRunner> file_task_runner();
 

@@ -1,8 +1,8 @@
 diff --git a/components/dom_distiller/content/browser/distiller_page_web_contents.cc b/components/dom_distiller/content/browser/distiller_page_web_contents.cc
-index f6f70aef104237a0221a4597fad44284a9919445..1066e21a264b1d2e316e84d1a05982bc8e1c2289 100644
+index 223e08e374a8db7558d205d2a76e156fc924126b..0491f2d2908fe8c8990a26873ad823c63c74f77c 100644
 --- a/components/dom_distiller/content/browser/distiller_page_web_contents.cc
 +++ b/components/dom_distiller/content/browser/distiller_page_web_contents.cc
-@@ -179,7 +179,9 @@ void DistillerPageWebContents::ExecuteJavaScript() {
+@@ -171,7 +171,9 @@ void DistillerPageWebContents::ExecuteJavaScript() {
    content::WebContentsObserver::Observe(nullptr);
    // Stop any pending navigation since the intent is to distill the current
    // page.

@@ -8,16 +8,19 @@
 #include "base/values.h"
 #include "brave/browser/brave_stats_updater.h"
 #include "brave/browser/metrics/metrics_reporting_util.h"
+#include "brave/browser/themes/brave_dark_mode_utils.h"
 #include "brave/browser/tor/buildflags.h"
+#include "brave/common/pref_names.h"
 #include "brave/components/brave_referrals/buildflags/buildflags.h"
 #include "brave/components/brave_shields/browser/ad_block_service.h"
 #include "brave/components/brave_shields/browser/brave_shields_p3a.h"
-#include "brave/components/p3a/buildflags.h"
 #include "brave/components/p3a/brave_p3a_service.h"
-#include "chrome/common/pref_names.h"
+#include "brave/components/p3a/buildflags.h"
 #include "chrome/browser/first_run/first_run.h"
+#include "chrome/common/pref_names.h"
 #include "components/metrics/metrics_pref_names.h"
 #include "components/prefs/pref_registry_simple.h"
+#include "third_party/widevine/cdm/buildflags.h"
 
 #if BUILDFLAG(ENABLE_BRAVE_REFERRALS)
 #include "brave/components/brave_referrals/browser/brave_referrals_service.h"
@@ -31,11 +34,16 @@
 #include "brave/components/p3a/p3a_core_metrics.h"
 #endif  // !defined(OS_ANDROID)
 
+#if BUILDFLAG(ENABLE_WIDEVINE)
+#include "brave/browser/widevine/widevine_utils.h"
+#endif
+
 namespace brave {
 
 void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
   brave_shields::RegisterPrefsForAdBlockService(registry);
   RegisterPrefsForBraveStatsUpdater(registry);
+  registry->RegisterBooleanPref(kRemoteDebuggingEnabled, false);
 #if BUILDFLAG(ENABLE_BRAVE_REFERRALS)
   RegisterPrefsForBraveReferralsService(registry);
 #endif
@@ -47,9 +55,6 @@ void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
 #if BUILDFLAG(ENABLE_TOR)
   tor::TorProfileService::RegisterLocalStatePrefs(registry);
 #endif
-#if !defined(OS_ANDROID)
-  RegisterPrefsForMuonMigration(registry);
-#endif
   registry->SetDefaultPrefValue(
       metrics::prefs::kMetricsReportingEnabled,
       base::Value(GetDefaultPrefValueForMetricsReporting()));
@@ -60,8 +65,15 @@ void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
 
   brave_shields::RegisterShieldsP3APrefs(registry);
 #if !defined(OS_ANDROID)
+  RegisterPrefsForMuonMigration(registry);
+
   BraveWindowTracker::RegisterPrefs(registry);
   BraveUptimeTracker::RegisterPrefs(registry);
+  dark_mode::RegisterBraveDarkModeLocalStatePrefs(registry);
+#endif
+
+#if BUILDFLAG(ENABLE_WIDEVINE)
+  RegisterWidevineLocalstatePrefs(registry);
 #endif
 }
 

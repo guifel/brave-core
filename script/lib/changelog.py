@@ -27,7 +27,7 @@ def render_markdown(changelog_txt, version, logging):
                 version_changes = output['children'][pos+1]
         pos = pos + 1
     if version_heading and version_changes:
-        heading = reconstruct_heading(version_heading)
+        heading = '# Release Notes'
         s = heading + '\n'
         s = s + '\n'
         changes = reconstruct_brave_changelog_list(version_changes)
@@ -49,17 +49,6 @@ def render_html(changelog_txt, version, logging):
     return rendered
 
 
-def reconstruct_heading(heading):
-    """
-    heading is a dict
-    """
-
-    if heading['type'] is "Heading":
-        return ("{} [{}]({})".format('#'*heading['level'],
-                                     heading['children'][0]['children'][0]['content'],
-                                     heading['children'][0]['target']))
-
-
 def reconstruct_brave_changelog_list(li):
     """
     li is a list
@@ -68,11 +57,26 @@ def reconstruct_brave_changelog_list(li):
     changes = []
 
     for item in li['children']:
-        for item2 in item['children']:
-            changes.append("{} {}[{}]({}){}".format(' -', item2['children'][0]['content'],
-                                                    item2['children'][1]['children'][0]['content'],
-                                                    item2['children'][1]['target'],
-                                                    item2['children'][2]['content']))
+        # For special markdown characters such as *EMPHASIS* or `inline code
+        # blocks`, mistletoe's AST provides us with a nested list. We need
+        # to traverse the list elements and append them to a single string.
+        # During this process we also remove the special characters.
+        appended_entry = str()
+        for item2 in item['children'][0]['children']:
+            if 'RawText' in item2['type']:
+                appended_entry = appended_entry + '{}'.format(item2['content'])
+            elif 'Link' in item2['type']:
+                appended_entry = appended_entry + '[{}]({})'.format(item2['children'][0]['content'], item2['target'])
+            elif 'InlineCode' in item2['type']:
+                appended_entry = appended_entry + '{}'.format(item2['children'][0]['content'])
+            else:
+                # Try to catch all other markdown types in this general case
+                #
+                # Mistletoe types defined here:
+                # https://github.com/miyuchina/mistletoe/blob/master/mistletoe/base_renderer.py#L47-L71
+                appended_entry = appended_entry + '{}'.format(item2['children'][0]['content'])
+
+        changes.append(" {} {}".format(' -', appended_entry))
     return changes
 
 

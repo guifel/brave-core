@@ -1,0 +1,13 @@
+diff --git a/third_party/blink/renderer/core/frame/navigator.idl b/third_party/blink/renderer/core/frame/navigator.idl
+index f13febb148e985aa5401ca6ae3221fce45a97261..e8dee21713a439aad1d9edb6aa087d35c7a95192 100644
+--- a/third_party/blink/renderer/core/frame/navigator.idl
++++ b/third_party/blink/renderer/core/frame/navigator.idl
+@@ -36,7 +36,7 @@
+ 
+ Navigator includes NavigatorConcurrentHardware;
+ Navigator includes NavigatorCookies;
+-Navigator includes NavigatorDeviceMemory;
++// Navigator includes NavigatorDeviceMemory;
+ Navigator includes NavigatorID;
+ Navigator includes NavigatorLanguage;
+ Navigator includes NavigatorOnLine;

@@ -32,6 +32,9 @@
               "dailyCap": {
                 "type": "number"
               },
+              "advertiserId": {
+                "type": "string"
+              },
               "perDay": {
                 "type": "number"
               },
@@ -61,6 +64,33 @@
         }
       },
       "additionalProperties": false
+    },
+    "conversions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "creativeSetId",
+          "urlPattern",
+          "type",
+          "observationWindow"
+        ],
+        "properties": {
+          "creativeSetId": {
+            "type": "string"
+          },
+          "urlPattern": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "observationWindow": {
+            "type": "number"
+          }
+        }
+      }
     }
   },
   "required": [

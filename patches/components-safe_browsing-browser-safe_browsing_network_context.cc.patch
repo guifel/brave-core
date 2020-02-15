@@ -1,13 +1,13 @@
 diff --git a/components/safe_browsing/browser/safe_browsing_network_context.cc b/components/safe_browsing/browser/safe_browsing_network_context.cc
-index 713f202f06f874faa1c9eb792585dd891fb8d81d..2c44ab779b8434458f65b22c9a7343d2449a0f26 100644
+index 20d5b04cbe6494c853c3feee9e868a053a337007..972e9a3dee3da638a8a3c74e673dce63d8be2480 100644
 --- a/components/safe_browsing/browser/safe_browsing_network_context.cc
 +++ b/components/safe_browsing/browser/safe_browsing_network_context.cc
-@@ -73,7 +73,7 @@ class SafeBrowsingNetworkContext::SharedURLLoaderFactory
-                                 traffic_annotation) override {
+@@ -78,7 +78,7 @@ class SafeBrowsingNetworkContext::SharedURLLoaderFactory
+       override {
      DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
      GetURLLoaderFactory()->CreateLoaderAndStart(
 -        std::move(loader), routing_id, request_id, options, request,
-+        std::move(loader), routing_id, request_id, options, brave::OnBeforeSystemRequest(request),
++        std::move(loader), routing_id, request_id, options, network::SystemRequestHandler::GetInstance()->OnBeforeSystemRequest(request),
          std::move(client), traffic_annotation);
    }
  

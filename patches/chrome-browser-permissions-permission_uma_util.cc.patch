@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/permissions/permission_uma_util.cc b/chrome/browser/permissions/permission_uma_util.cc
-index 50768c0a91bb5f29760e398ed9c6486a06334b49..18c8118777376ddd24e88ad38576be092e214ba0 100644
+index f6dd452d5f2fa800cd39cec3611fa01c899f6b98..0a681059978b661add0f1406aa6b2248565fe1f6 100644
 --- a/chrome/browser/permissions/permission_uma_util.cc
 +++ b/chrome/browser/permissions/permission_uma_util.cc
 @@ -65,7 +65,7 @@ namespace {
@@ -11,11 +11,11 @@ index 50768c0a91bb5f29760e398ed9c6486a06334b49..18c8118777376ddd24e88ad38576be09
    switch (type) {
      case PermissionRequestType::MULTIPLE:
        return "AudioAndVideoCapture";
-@@ -426,6 +426,9 @@ void PermissionUmaUtil::RecordPermissionAction(
-       UMA_HISTOGRAM_ENUMERATION("Permissions.Action.PaymentHandler", action,
-                                 PermissionAction::NUM);
+@@ -472,6 +472,9 @@ void PermissionUmaUtil::RecordPermissionAction(
+       base::UmaHistogramEnumeration("Permissions.Action.Nfc", action,
+                                     PermissionAction::NUM);
        break;
-+    case CONTENT_SETTINGS_TYPE_AUTOPLAY:
++    case ContentSettingsType::AUTOPLAY:
 +      BraveRecordPermissionAction(permission, secure_origin, action);
 +      break;
      // The user is not prompted for these permissions, thus there is no

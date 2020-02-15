@@ -3,9 +3,26 @@ import("//brave/build/config.gni")
 import("//brave/components/brave_rewards/browser/buildflags/buildflags.gni")
 import("//brave/components/brave_sync/buildflags/buildflags.gni")
 import("//brave/components/brave_wallet/browser/buildflags/buildflags.gni")
+import("//brave/components/brave_wayback_machine/buildflags/buildflags.gni")
 import("//build/config/features.gni")
 import("//components/gcm_driver/config.gni")
 import("//chrome/common/features.gni")
+
+source_set("favicon_source") {
+  sources = [
+    "//chrome/browser/ui/webui/favicon_source.cc",
+    "//chrome/browser/ui/webui/favicon_source.h",
+  ]
+
+  deps = [
+    "//components/favicon/core",
+    "//components/favicon_base",
+    "//components/history/core/browser",
+    "//net",
+    "//ui/native_theme",
+    "//url",
+  ]
+}
 
 source_set("ui") {
   sources = [
@@ -13,6 +30,8 @@ source_set("ui") {
     "webui/basic_ui.h",
     "webui/brave_adblock_ui.cc",
     "webui/brave_adblock_ui.h",
+    "webui/webcompat_reporter_ui.cc",
+    "webui/webcompat_reporter_ui.h",
     "webui/brave_new_tab_message_handler.cc",
     "webui/brave_new_tab_message_handler.h",
     "webui/brave_new_tab_ui.cc",
@@ -60,8 +79,10 @@ source_set("ui") {
       "content_settings/brave_content_setting_bubble_model.h",
       "content_settings/brave_content_setting_image_models.cc",
       "content_settings/brave_content_setting_image_models.h",
-      "omnibox/brave_omnibox_client.cc",
-      "omnibox/brave_omnibox_client.h",
+      "omnibox/brave_omnibox_client_impl.cc",
+      "omnibox/brave_omnibox_client_impl.h",
+      "tabs/brave_tab_menu_model.cc",
+      "tabs/brave_tab_menu_model.h",
       "toolbar/brave_app_menu_model.cc",
       "toolbar/brave_app_menu_model.h",
       "webui/brave_settings_ui.cc",
@@ -70,6 +91,8 @@ source_set("ui") {
       "webui/navigation_bar_data_provider.h",
       "webui/settings/brave_about_handler.cc",
       "webui/settings/brave_about_handler.h",
+      "webui/settings/brave_appearance_handler.cc",
+      "webui/settings/brave_appearance_handler.h",
       "webui/settings/brave_privacy_handler.cc",
       "webui/settings/brave_privacy_handler.h",
       "webui/settings/default_brave_shields_handler.cc",
@@ -98,6 +121,12 @@ source_set("ui") {
       "views/reader_mode/brave_reader_mode_icon_view.h",
       "views/rounded_separator.cc",
       "views/rounded_separator.h",
+      "views/tabs/brave_browser_tab_strip_controller.cc",
+      "views/tabs/brave_browser_tab_strip_controller.h",
+      "views/tabs/brave_tab_close_button.cc",
+      "views/tabs/brave_tab_close_button.h",
+      "views/tabs/brave_tab_context_menu_contents.cc",
+      "views/tabs/brave_tab_context_menu_contents.h",
       "views/toolbar/bookmark_button.cc",
       "views/toolbar/bookmark_button.h",
     ]
@@ -141,8 +170,6 @@ source_set("ui") {
 
   if (is_linux) {
     sources += [
-      "views/brave_browser_main_extra_parts_views_linux.cc",
-      "views/brave_browser_main_extra_parts_views_linux.h",
       "views/brave_views_delegate_linux.cc",
       "views/brave_views_delegate_linux.h",
     ]
@@ -160,23 +187,31 @@ source_set("ui") {
     "//brave/browser/profiles",
     "//brave/browser/resources/settings:resources",
     "//brave/browser/tor",
+    "//brave/components/brave_wayback_machine:buildflags",
+    "//brave/components/webcompat_reporter/browser",
     "//brave/common",
     "//brave/common:pref_names",
+    "//brave/common/tor",
     "//brave/components/brave_adblock_ui:generated_resources",
+    "//brave/components/webcompat_reporter/ui:generated_resources",
     "//brave/components/brave_new_tab_ui:generated_resources",
+    "//brave/components/brave_ads/browser",
     "//brave/components/brave_rewards/browser",
     "//brave/components/brave_rewards/resources",
     "//brave/components/brave_shields/browser",
     "//brave/components/brave_sync/buildflags:buildflags",
     "//brave/components/brave_wallet/browser/buildflags:buildflags",
     "//brave/components/brave_welcome_ui:generated_resources",
+    "//brave/components/p3a:buildflags",
     "//chrome/app:command_ids",
     "//chrome/app/vector_icons:vector_icons",
     "//chrome/common",
     "//components/gcm_driver:gcm_buildflags",
     "//components/prefs",
+    "//components/sessions",
     "//content/public/browser",
     "//content/public/common",
+    "//services/network/public/cpp",
     "//skia",
     "//ui/accessibility",
     "//ui/base",
@@ -184,19 +219,36 @@ source_set("ui") {
     "//ui/resources",
   ]
 
+  # This is no longer compiled into Chromium on Android, but we still
+  # need it
+  if (is_android) {
+    deps += [
+      ":favicon_source",
+    ]
+  }
+
   if (enable_brave_sync) {
     deps += [
       "//brave/components/brave_sync",
       "//brave/components/brave_sync:generated_resources",
       "//brave/components/brave_sync:static_resources",
-      "//brave/components/brave_sync:switches",
+      "//components/sync/driver:driver",
     ]
+  }
+
+  if (enable_brave_wayback_machine) {
+    deps += [ "//brave/components/brave_wayback_machine" ]
+
+    if (toolkit_views) {
+      deps += [ "//brave/browser/ui/views/infobars:brave_wayback_machine" ]
+    }
   }
 
   if (!is_android) {
     deps += [
       "//brave/app:brave_generated_resources_grit",
       "//brave/browser:version_info",
+      "//third_party/blink/public/common",
     ]
   }
 
@@ -216,6 +268,8 @@ source_set("ui") {
       "views/brave_actions/brave_actions_container.h",
       "views/location_bar/brave_location_bar_view.cc",
       "views/location_bar/brave_location_bar_view.h",
+      "views/location_bar/brave_star_view.cc",
+      "views/location_bar/brave_star_view.h",
       "views/profiles/brave_avatar_toolbar_button.cc",
       "views/profiles/brave_avatar_toolbar_button.h",
       "views/tabs/brave_alert_indicator.cc",
@@ -224,9 +278,14 @@ source_set("ui") {
       "views/tabs/brave_new_tab_button.h",
       "views/toolbar/brave_toolbar_view.cc",
       "views/toolbar/brave_toolbar_view.h",
-      "webui/settings/brave_default_extensions_handler.cc",
-      "webui/settings/brave_default_extensions_handler.h",
     ]
+
+    if (enable_extensions) {
+      sources += [
+        "webui/settings/brave_default_extensions_handler.cc",
+        "webui/settings/brave_default_extensions_handler.h",
+      ]
+    }
 
     if (brave_rewards_enabled) {
       sources += [
@@ -286,6 +345,8 @@ source_set("ui") {
   }
 
   if (toolkit_views) {
+    deps += [ "//ui/views" ]
+
     if (enable_brave_translate_extension) {
       deps += [ "//components/translate/core/browser" ]
     }

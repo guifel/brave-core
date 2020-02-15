@@ -71,46 +71,28 @@ TEST(UpholdUtilTest, GetFeeAddress) {
   ASSERT_EQ(result, kFeeAddressStaging);
 }
 
-TEST(UpholdUtilTest, ConvertToProbi) {
-  // empty string
-  std::string result = braveledger_uphold::ConvertToProbi("");
-  ASSERT_EQ(result, "0");
-
-  // single dig int
-  result = braveledger_uphold::ConvertToProbi("5");
-  ASSERT_EQ(result, "5000000000000000000");
-
-  // two dig int
-  result = braveledger_uphold::ConvertToProbi("15");
-  ASSERT_EQ(result, "15000000000000000000");
-
-  // single dig decimal
-  result = braveledger_uphold::ConvertToProbi("5.4");
-  ASSERT_EQ(result, "5400000000000000000");
-
-  // two dig decimal
-  result = braveledger_uphold::ConvertToProbi("5.45");
-  ASSERT_EQ(result, "5450000000000000000");
-}
-
 TEST(UpholdUtilTest, GetVerifyUrl) {
   // production
   ledger::_environment = ledger::Environment::PRODUCTION;
   std::string result = braveledger_uphold::GetVerifyUrl("rdfdsfsdfsdf");
   ASSERT_EQ(result,
       "https://uphold.com/authorize/"
-      "6d8d9473ed20be627f71ed46e207f40c004c5b1a?scope=cards:read cards:write "
-      "user:read transactions:read transactions:transfer:application "
-      "transactions:transfer:others&intention=kyc&state=rdfdsfsdfsdf");
+      "6d8d9473ed20be627f71ed46e207f40c004c5b1a?scope=accounts:read "
+      "accounts:write cards:read cards:write user:read "
+      "transactions:deposit transactions:read "
+      "transactions:transfer:application transactions:transfer:others"
+      "&intention=kyc&state=rdfdsfsdfsdf");
 
   // staging
   ledger::_environment = ledger::Environment::STAGING;
   result = braveledger_uphold::GetVerifyUrl("rdfdsfsdfsdf");
   ASSERT_EQ(result,
       "https://sandbox.uphold.com/authorize/"
-      "4c2b665ca060d912fec5c735c734859a06118cc8?scope=cards:read cards:write "
-      "user:read transactions:read transactions:transfer:application "
-      "transactions:transfer:others&intention=kyc&state=rdfdsfsdfsdf");
+      "4c2b665ca060d912fec5c735c734859a06118cc8?scope=accounts:read "
+      "accounts:write cards:read cards:write user:read "
+      "transactions:deposit transactions:read "
+      "transactions:transfer:application transactions:transfer:others"
+      "&intention=kyc&state=rdfdsfsdfsdf");
 }
 
 TEST(UpholdUtilTest, GetAddUrl) {
@@ -224,9 +206,11 @@ TEST(UpholdUtilTest, GenerateLinks) {
   ASSERT_EQ(result->withdraw_url, "");
   ASSERT_EQ(result->verify_url,
       "https://sandbox.uphold.com/authorize/4c2b665ca060d912fec5c735c734859a06"
-      "118cc8?scope=cards:read cards:write user:read transactions:read "
-      "transactions:transfer:application transactions:transfer:others&"
-      "intention=kyc&state=");
+      "118cc8?scope=accounts:read "
+      "accounts:write cards:read cards:write user:read "
+      "transactions:deposit transactions:read "
+      "transactions:transfer:application transactions:transfer:others"
+      "&intention=kyc&state=");
   ASSERT_EQ(result->account_url, "https://sandbox.uphold.com/dashboard");
 
   // Connected
@@ -259,7 +243,9 @@ TEST(UpholdUtilTest, GenerateLinks) {
   ASSERT_EQ(result->withdraw_url, "");
   ASSERT_EQ(result->verify_url,
       "https://sandbox.uphold.com/authorize/4c2b665ca060d912fec5c735c734859a0"
-      "6118cc8?scope=cards:read cards:write user:read transactions:read "
+      "6118cc8?scope=accounts:read "
+      "accounts:write cards:read cards:write user:read "
+      "transactions:deposit transactions:read "
       "transactions:transfer:application transactions:transfer:others"
       "&intention=kyc&state=");
   ASSERT_EQ(result->account_url, "https://sandbox.uphold.com/dashboard");
@@ -271,7 +257,9 @@ TEST(UpholdUtilTest, GenerateLinks) {
   ASSERT_EQ(result->withdraw_url, "");
   ASSERT_EQ(result->verify_url,
       "https://sandbox.uphold.com/authorize/4c2b665ca060d912fec5c735c734859a0"
-      "6118cc8?scope=cards:read cards:write user:read transactions:read "
+      "6118cc8?scope=accounts:read "
+      "accounts:write cards:read cards:write user:read "
+      "transactions:deposit transactions:read "
       "transactions:transfer:application transactions:transfer:others"
       "&intention=kyc&state=");
   ASSERT_EQ(result->account_url, "https://sandbox.uphold.com/dashboard");
@@ -305,9 +293,11 @@ TEST(UpholdUtilTest, GenerateVerifyLink) {
   auto result = braveledger_uphold::GenerateVerifyLink(wallet->Clone());
   ASSERT_EQ(result,
       "https://sandbox.uphold.com/authorize/4c2b665ca060d912fec5c735c734859a06"
-      "118cc8?scope=cards:read cards:write user:read transactions:read "
-      "transactions:transfer:application transactions:transfer:others&"
-      "intention=kyc&state=123123123124234234234");
+      "118cc8?scope=accounts:read "
+      "accounts:write cards:read cards:write user:read "
+      "transactions:deposit transactions:read "
+      "transactions:transfer:application transactions:transfer:others"
+      "&intention=kyc&state=123123123124234234234");
 
   // Connected
   wallet->status = ledger::WalletStatus::CONNECTED;
@@ -326,18 +316,22 @@ TEST(UpholdUtilTest, GenerateVerifyLink) {
   result = braveledger_uphold::GenerateVerifyLink(wallet->Clone());
   ASSERT_EQ(result,
       "https://sandbox.uphold.com/authorize/4c2b665ca060d912fec5c735c734859a06"
-      "118cc8?scope=cards:read cards:write user:read transactions:read "
-      "transactions:transfer:application transactions:transfer:others&"
-      "intention=kyc&state=123123123124234234234");
+      "118cc8?scope=accounts:read "
+      "accounts:write cards:read cards:write user:read "
+      "transactions:deposit transactions:read "
+      "transactions:transfer:application transactions:transfer:others"
+      "&intention=kyc&state=123123123124234234234");
 
   // Disconnected Verified
   wallet->status = ledger::WalletStatus::DISCONNECTED_VERIFIED;
   result = braveledger_uphold::GenerateVerifyLink(wallet->Clone());
   ASSERT_EQ(result,
       "https://sandbox.uphold.com/authorize/4c2b665ca060d912fec5c735c734859a06"
-      "118cc8?scope=cards:read cards:write user:read transactions:read "
-      "transactions:transfer:application transactions:transfer:others&"
-      "intention=kyc&state=123123123124234234234");
+      "118cc8?scope=accounts:read "
+      "accounts:write cards:read cards:write user:read "
+      "transactions:deposit transactions:read "
+      "transactions:transfer:application transactions:transfer:others"
+      "&intention=kyc&state=123123123124234234234");
 
   // Pending
   wallet->status = ledger::WalletStatus::PENDING;

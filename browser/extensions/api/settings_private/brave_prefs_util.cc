@@ -6,6 +6,7 @@
 #include "brave/browser/extensions/api/settings_private/brave_prefs_util.h"
 
 #include "brave/common/pref_names.h"
+#include "brave/components/brave_wayback_machine/buildflags.h"
 #include "chrome/browser/extensions/api/settings_private/prefs_util.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/extensions/api/settings_private.h"
@@ -14,6 +15,10 @@
 
 #if !BUILDFLAG(USE_GCM_FROM_PLATFORM)
 #include "components/gcm_driver/gcm_channel_status_syncer.h"
+#endif
+
+#if BUILDFLAG(ENABLE_BRAVE_WAYBACK_MACHINE)
+#include "brave/components/brave_wayback_machine/pref_names.h"
 #endif
 
 namespace extensions {
@@ -48,6 +53,8 @@ const PrefsUtil::TypedPrefMap& BravePrefsUtil::GetWhitelistedKeys() {
       settings_api::PrefType::PREF_TYPE_BOOLEAN;
   (*s_brave_whitelist)[kNoScriptControlType] =
       settings_api::PrefType::PREF_TYPE_BOOLEAN;
+  (*s_brave_whitelist)[kGoogleLoginControlType] =
+      settings_api::PrefType::PREF_TYPE_BOOLEAN;
   (*s_brave_whitelist)[kFBEmbedControlType] =
       settings_api::PrefType::PREF_TYPE_BOOLEAN;
   (*s_brave_whitelist)[kTwitterEmbedControlType] =
@@ -58,10 +65,10 @@ const PrefsUtil::TypedPrefMap& BravePrefsUtil::GetWhitelistedKeys() {
   // appearance prefs
   (*s_brave_whitelist)[kLocationBarIsWide] =
     settings_api::PrefType::PREF_TYPE_BOOLEAN;
+  (*s_brave_whitelist)[kAutocompleteEnabled] =
+      settings_api::PrefType::PREF_TYPE_BOOLEAN;
   (*s_brave_whitelist)[kHideBraveRewardsButton] =
       settings_api::PrefType::PREF_TYPE_BOOLEAN;
-  (*s_brave_whitelist)[kBraveThemeType] =
-      settings_api::PrefType::PREF_TYPE_NUMBER;
   (*s_brave_whitelist)[kAskWidevineInstall] =
       settings_api::PrefType::PREF_TYPE_BOOLEAN;
   // Tabs prefs
@@ -89,6 +96,10 @@ const PrefsUtil::TypedPrefMap& BravePrefsUtil::GetWhitelistedKeys() {
   // WebTorrent pref
   (*s_brave_whitelist)[kWebTorrentEnabled] =
       settings_api::PrefType::PREF_TYPE_BOOLEAN;
+#if BUILDFLAG(ENABLE_BRAVE_WAYBACK_MACHINE)
+  (*s_brave_whitelist)[kBraveWaybackMachineEnabled] =
+      settings_api::PrefType::PREF_TYPE_BOOLEAN;
+#endif
   // Hangouts pref
   (*s_brave_whitelist)[kHangoutsEnabled] =
       settings_api::PrefType::PREF_TYPE_BOOLEAN;
@@ -96,8 +107,8 @@ const PrefsUtil::TypedPrefMap& BravePrefsUtil::GetWhitelistedKeys() {
   (*s_brave_whitelist)[kIPFSCompanionEnabled] =
       settings_api::PrefType::PREF_TYPE_BOOLEAN;
   // Brave Wallet pref
-  (*s_brave_whitelist)[kBraveWalletEnabled] =
-      settings_api::PrefType::PREF_TYPE_BOOLEAN;
+  (*s_brave_whitelist)[kBraveWalletWeb3Provider] =
+      settings_api::PrefType::PREF_TYPE_NUMBER;
   // Media Router Pref
   (*s_brave_whitelist)[kBraveEnabledMediaRouter] =
       settings_api::PrefType::PREF_TYPE_BOOLEAN;

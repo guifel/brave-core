@@ -1,8 +1,8 @@
 diff --git a/content/browser/browser_main_loop.h b/content/browser/browser_main_loop.h
-index 306dfc80bf5133dbedbbb4d429edf97a548ada9f..fb13f74b53499fb1caa4e3977ca4fe309d8f698d 100644
+index 92667bcb896d36e7c09ffc55d978102aeb8f35bd..7118a4ca9f443375598f14ec138d8a34e9feb6c8 100644
 --- a/content/browser/browser_main_loop.h
 +++ b/content/browser/browser_main_loop.h
-@@ -141,6 +141,7 @@ class CONTENT_EXPORT BrowserMainLoop {
+@@ -139,6 +139,7 @@ class CONTENT_EXPORT BrowserMainLoop {
    void PreMainMessageLoopStart();
    void MainMessageLoopStart();
    void PostMainMessageLoopStart();

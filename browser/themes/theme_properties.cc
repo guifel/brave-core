@@ -5,8 +5,8 @@
 
 #include "brave/browser/themes/theme_properties.h"
 
-#include "brave/browser/themes/brave_theme_service.h"
 #include "chrome/browser/themes/theme_properties.h"
+#include "ui/gfx/color_palette.h"
 
 namespace {
 
@@ -40,6 +40,10 @@ base::Optional<SkColor> MaybeGetDefaultColorForBraveLightUi(int id) {
       return kLightToolbarIcon;
     case ThemeProperties::COLOR_TOOLBAR_BUTTON_ICON_INACTIVE:
       return color_utils::AlphaBlend(kLightToolbarIcon, kLightToolbar, 0.3f);
+    case BraveThemeProperties::COLOR_WAYBACK_INFOBAR_SEPARATOR:
+      return gfx::kBraveNeutral300;
+    case BraveThemeProperties::COLOR_WAYBACK_INFOBAR_SAD_FOLDER:
+      return gfx::kBraveGrey700;
     case BraveThemeProperties::COLOR_FOR_TEST:
       return BraveThemeProperties::kLightColorForTest;
     default:
@@ -79,6 +83,10 @@ base::Optional<SkColor> MaybeGetDefaultColorForBraveDarkUi(int id) {
       return kDarkToolbarIcon;
     case ThemeProperties::COLOR_TOOLBAR_BUTTON_ICON_INACTIVE:
       return color_utils::AlphaBlend(kDarkToolbarIcon, kDarkToolbar, 0.3f);
+    case BraveThemeProperties::COLOR_WAYBACK_INFOBAR_SEPARATOR:
+      return gfx::kBraveNeutral800;
+    case BraveThemeProperties::COLOR_WAYBACK_INFOBAR_SAD_FOLDER:
+      return SK_ColorWHITE;
     case BraveThemeProperties::COLOR_FOR_TEST:
       return BraveThemeProperties::kDarkColorForTest;
     default:
@@ -129,8 +137,8 @@ base::Optional<SkColor> MaybeGetDefaultColorForPrivateUi(int id) {
 }  // namespace
 
 // Returns a |nullopt| if the UI color is not handled by Brave.
-base::Optional<SkColor> MaybeGetDefaultColorForBraveUi(int id, bool incognito,
-    BraveThemeType theme) {
+base::Optional<SkColor> MaybeGetDefaultColorForBraveUi(
+    int id, bool incognito, dark_mode::BraveDarkModeType dark_mode) {
   // Consistent (and stable) values across all themes
   switch (id) {
     case ThemeProperties::COLOR_TAB_THROBBER_SPINNING:
@@ -144,10 +152,10 @@ base::Optional<SkColor> MaybeGetDefaultColorForBraveUi(int id, bool incognito,
     return MaybeGetDefaultColorForPrivateUi(id);
   }
   // Get Dark or Light value
-  switch (theme) {
-    case BraveThemeType::BRAVE_THEME_TYPE_LIGHT:
+  switch (dark_mode) {
+    case dark_mode::BraveDarkModeType::BRAVE_DARK_MODE_TYPE_LIGHT:
       return MaybeGetDefaultColorForBraveLightUi(id);
-    case BraveThemeType::BRAVE_THEME_TYPE_DARK:
+    case dark_mode::BraveDarkModeType::BRAVE_DARK_MODE_TYPE_DARK:
       return MaybeGetDefaultColorForBraveDarkUi(id);
     default:
       NOTREACHED();

@@ -1,4 +1,21 @@
+// Copyright (c) 2019 The Brave Authors. All rights reserved.
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this file,
+// you can obtain one at http://mozilla.org/MPL/2.0/.
+
 declare namespace NewTab {
+
+  export type BrandedWallpaperLogo = {
+    image: string
+    companyName: string
+    alt: string
+    destinationUrl: string
+  }
+
+  export interface BrandedWallpaper {
+    wallpaperImageUrl: string
+    logo: BrandedWallpaperLogo
+  }
   export interface ApplicationState {
     newTabData: State | undefined
   }
@@ -28,6 +45,7 @@ declare namespace NewTab {
     javascriptBlockedStat: number
     httpsUpgradesStat: number
     fingerprintingBlockedStat: number
+    bandwidthSavedStat: number
   }
 
   export interface Bookmark {
@@ -52,6 +70,7 @@ declare namespace NewTab {
   export interface EphemeralState {
     initialDataLoaded: boolean
     textDirection: string
+    featureFlagBraveNTPBrandedWallpaper: boolean
     isIncognito: boolean
     useAlternativePrivateSearchEngine: boolean
     isTor: boolean
@@ -64,7 +83,10 @@ declare namespace NewTab {
     showClock: boolean
     showTopSites: boolean
     showRewards: boolean
-    stats: Stats
+    brandedWallpaperOptIn: boolean
+    isBrandedWallpaperNotificationDismissed: boolean
+    stats: Stats,
+    brandedWallpaperData?: BrandedWallpaper
   }
 
   export interface RewardsWidgetState {
@@ -74,9 +96,9 @@ declare namespace NewTab {
     dismissedNotifications: string[]
     enabledAds: boolean
     enabledMain: boolean
-    grants: GrantRecord[]
+    promotions: Promotion[]
     onlyAnonWallet: boolean
-    totalContribution: string
+    totalContribution: number
     walletCreated: boolean
     walletCreating: boolean
     walletCreateFailed: boolean
@@ -97,30 +119,29 @@ declare namespace NewTab {
     REGISTRATION_VERIFICATION_FAILED = 10,
     BAD_REGISTRATION_RESPONSE = 11,
     WALLET_CREATED = 12,
-    GRANT_NOT_FOUND = 13,
     WALLET_CORRUPT = 17
   }
 
-  export interface RewardsReport {
-    ads: string
-    closing: string
-    contribute: string
-    deposit: string
-    donation: string
-    grant: string
-    tips: string
-    opening: string
-    total: string
+  export interface RewardsBalanceReport {
+    ads: number
+    contribute: number
+    donation: number
+    grant: number
+    tips: number
   }
 
-  export interface GrantResponse {
-    promotionId?: string
-    status?: number
-    type?: string
+  export enum PromotionTypes {
+    UGP = 0,
+    ADS = 1
   }
 
-  export interface GrantRecord {
-    type: string
+  export interface PromotionResponse {
+    result: number
+    promotions: Promotion[]
+  }
+
+  export interface Promotion {
+    type: PromotionTypes
     promotionId: string
   }
 

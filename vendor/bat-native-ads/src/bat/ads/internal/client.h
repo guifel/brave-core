@@ -28,8 +28,8 @@ class Client {
 
   void Initialize(InitializeCallback callback);
 
-  void AppendAdToAdsShownHistory(const AdHistoryDetail& ad_history_detail);
-  const std::deque<AdHistoryDetail> GetAdsShownHistory() const;
+  void AppendAdHistoryToAdsShownHistory(const AdHistory& ad_history);
+  const std::deque<AdHistory> GetAdsShownHistory() const;
   AdContent::LikeAction ToggleAdThumbUp(const std::string& id,
                                         const std::string& creative_set_id,
                                         AdContent::LikeAction action);
@@ -55,6 +55,12 @@ class Client {
   void UpdateAdsUUIDSeen(const std::string& uuid, uint64_t value);
   const std::map<std::string, uint64_t> GetAdsUUIDSeen();
   void ResetAdsUUIDSeen(const std::vector<AdInfo>& ads);
+  void UpdateAdvertisersUUIDSeen(
+      const std::string& uuid,
+      const uint64_t value);
+  const std::map<std::string, uint64_t> GetAdvertisersUUIDSeen();
+  void ResetAdvertisersUUIDSeen(
+      const std::vector<AdInfo>& ads);
   void SetNextCheckServeAdTimestampInSeconds(
       const uint64_t timestamp_in_seconds);
   uint64_t GetNextCheckServeAdTimestampInSeconds();
@@ -84,6 +90,11 @@ class Client {
       const uint64_t timestamp_in_seconds);
   const std::map<std::string, std::deque<uint64_t>>
       GetCreativeSetHistory() const;
+  void AppendTimestampToAdConversionHistoryForUuid(
+      const std::string& creative_set_id,
+      const uint64_t timestamp_in_seconds);
+  const std::map<std::string, std::deque<uint64_t>>
+      GetAdConversionHistory() const;
   void AppendTimestampToCampaignHistoryForUuid(
       const std::string& uuid,
       const uint64_t timestamp_in_seconds);

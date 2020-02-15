@@ -13,6 +13,7 @@
 #include "brave/components/brave_sync/client/brave_sync_client.h"
 #include "base/macros.h"
 #include "base/scoped_observer.h"
+#include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_registry_observer.h"
 #include "base/gtest_prod_util.h"
 
@@ -47,7 +48,8 @@ class BraveSyncClientImpl : public BraveSyncClient,
   // Browser to BraveSync messages
   void SendGotInitData(const Uint8Array& seed,
                        const Uint8Array& device_id,
-                       const client_data::Config& config) override;
+                       const client_data::Config& config,
+                       const std::string& device_id_v2) override;
   void SendFetchSyncRecords(
     const std::vector<std::string> &category_names, const base::Time &startAt,
     const int max_records) override;

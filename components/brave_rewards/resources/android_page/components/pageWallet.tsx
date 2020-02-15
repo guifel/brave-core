@@ -46,20 +46,24 @@ class PageWallet extends React.Component<Props, State> {
 
   getConversion = () => {
     const balance = this.props.rewardsData.balance
-    return utils.convertBalance(balance.total.toString(), balance.rates)
+    return utils.convertBalance(balance.total, balance.rates)
   }
 
-  getGrants = () => {
-    const grants = this.props.rewardsData.walletInfo.grants
-    if (!grants) {
+  generatePromotions = () => {
+    const promotions = this.props.rewardsData.promotions
+    if (!promotions) {
       return []
     }
 
-    return grants.map((grant: Rewards.Grant) => {
+    let claimedPromotions = promotions.filter((promotion: Rewards.Promotion) => {
+      return promotion.status === 4 // PromotionStatus::FINISHED
+    })
+
+    return claimedPromotions.map((promotion: Rewards.Promotion) => {
       return {
-        tokens: utils.convertProbiToFixed(grant.probi),
-        expireDate: new Date(grant.expiryTime * 1000).toLocaleDateString(),
-        type: grant.type || 'ugp'
+        amount: promotion.amount,
+        expiresAt: new Date(promotion.expiresAt * 1000).toLocaleDateString(),
+        type: promotion.type || 0
       }
     })
   }
@@ -78,22 +82,19 @@ class PageWallet extends React.Component<Props, State> {
   }
 
   getWalletSummary = () => {
-    const { balance, reports } = this.props.rewardsData
+    const { balance, balanceReport } = this.props.rewardsData
 
     let props = {}
 
-    const currentTime = new Date()
-    const reportKey = `${currentTime.getFullYear()}_${currentTime.getMonth() + 1}`
-    const report: Rewards.Report = reports[reportKey]
-    if (report) {
-      for (let key in report) {
-        const item = report[key]
+    if (balanceReport) {
+      for (let key in balanceReport) {
+        const item = balanceReport[key]
 
-        if (item.length > 1 && key !== 'total') {
-          const tokens = utils.convertProbiToFixed(item)
+        if (item !== 0) {
+          const tokens = item.toFixed(1)
           props[key] = {
             tokens,
-            converted: utils.convertBalance(tokens, balance.rates)
+            converted: utils.convertBalance(item, balance.rates)
           }
         }
       }
@@ -112,9 +113,14 @@ class PageWallet extends React.Component<Props, State> {
       ui,
       pendingContributionTotal
     } = this.props.rewardsData
-    const { emptyWallet } = ui
+    const { emptyWallet, onlyAnonWallet } = ui
     const { total } = balance
     const pendingTotal = parseFloat((pendingContributionTotal || 0).toFixed(1))
+
+    let showCopy = false
+    if (!onlyAnonWallet) {
+      showCopy = true
+    }
 
     if (!visible) {
       return null
@@ -133,10 +139,11 @@ class PageWallet extends React.Component<Props, State> {
               actions={[]}
               compact={true}
               isMobile={true}
-              showCopy={true}
+              showCopy={showCopy}
               showSecActions={false}
-              grants={this.getGrants()}
+              grants={this.generatePromotions()}
               alert={this.walletAlerts()}
+              onlyAnonWallet={onlyAnonWallet}
             >
               {
                 enabledMain
@@ -144,6 +151,7 @@ class PageWallet extends React.Component<Props, State> {
                   ? <WalletEmpty hideAddFundsText={true} />
                   : <WalletSummary
                     reservedAmount={pendingTotal}
+                    onlyAnonWallet={onlyAnonWallet}
                     reservedMoreLink={'https://brave.com/faq-rewards/#unclaimed-funds'}
                     {...this.getWalletSummary()}
                   />

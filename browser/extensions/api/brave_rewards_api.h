@@ -16,6 +16,7 @@
 #include "brave/components/brave_rewards/browser/external_wallet.h"
 #include "brave/components/brave_rewards/browser/publisher_banner.h"
 #include "brave/components/brave_rewards/browser/balance_report.h"
+#include "brave/components/brave_rewards/browser/promotion.h"
 #include "extensions/browser/extension_function.h"
 
 namespace extensions {
@@ -123,14 +124,19 @@ class BraveRewardsGetWalletPropertiesFunction : public ExtensionFunction {
   ResponseAction Run() override;
 };
 
-class BraveRewardsGetCurrentReportFunction : public ExtensionFunction {
+class BraveRewardsGetBalanceReportFunction : public ExtensionFunction {
  public:
-  DECLARE_EXTENSION_FUNCTION("braveRewards.getCurrentReport", UNKNOWN)
+  DECLARE_EXTENSION_FUNCTION("braveRewards.getBalanceReport", UNKNOWN)
 
  protected:
-  ~BraveRewardsGetCurrentReportFunction() override;
+  ~BraveRewardsGetBalanceReportFunction() override;
 
   ResponseAction Run() override;
+
+ private:
+  void OnBalanceReport(
+      const int32_t result,
+      const brave_rewards::BalanceReport& report);
 };
 
 class BraveRewardsIncludeInAutoContributionFunction : public ExtensionFunction {
@@ -143,34 +149,48 @@ class BraveRewardsIncludeInAutoContributionFunction : public ExtensionFunction {
   ResponseAction Run() override;
 };
 
-class BraveRewardsGetGrantsFunction : public ExtensionFunction {
+class BraveRewardsFetchPromotionsFunction : public ExtensionFunction {
  public:
-  DECLARE_EXTENSION_FUNCTION("braveRewards.getGrants", UNKNOWN)
+  DECLARE_EXTENSION_FUNCTION("braveRewards.fetchPromotions", UNKNOWN)
 
  protected:
-  ~BraveRewardsGetGrantsFunction() override;
+  ~BraveRewardsFetchPromotionsFunction() override;
 
   ResponseAction Run() override;
 };
 
-class BraveRewardsGetGrantCaptchaFunction : public ExtensionFunction {
+class BraveRewardsClaimPromotionFunction : public ExtensionFunction {
  public:
-  DECLARE_EXTENSION_FUNCTION("braveRewards.getGrantCaptcha", UNKNOWN)
+  DECLARE_EXTENSION_FUNCTION("braveRewards.claimPromotion", UNKNOWN)
 
  protected:
-  ~BraveRewardsGetGrantCaptchaFunction() override;
+  ~BraveRewardsClaimPromotionFunction() override;
 
   ResponseAction Run() override;
+
+ private:
+  void OnClaimPromotion(
+      const std::string& promotion_id,
+      const int32_t result,
+      const std::string& captcha_image,
+      const std::string& hint,
+      const std::string& captcha_id);
 };
 
-class BraveRewardsSolveGrantCaptchaFunction : public ExtensionFunction {
+class BraveRewardsAttestPromotionFunction : public ExtensionFunction {
  public:
-  DECLARE_EXTENSION_FUNCTION("braveRewards.solveGrantCaptcha", UNKNOWN)
+  DECLARE_EXTENSION_FUNCTION("braveRewards.attestPromotion", UNKNOWN)
 
  protected:
-  ~BraveRewardsSolveGrantCaptchaFunction() override;
+  ~BraveRewardsAttestPromotionFunction() override;
 
   ResponseAction Run() override;
+
+ private:
+  void OnAttestPromotion(
+      const std::string& promotion_id,
+      const int32_t result,
+      std::unique_ptr<::brave_rewards::Promotion> promotion);
 };
 
 class BraveRewardsGetPendingContributionsTotalFunction
@@ -400,22 +420,6 @@ class BraveRewardsGetAdsEstimatedEarningsFunction
       const uint64_t ad_notifications_received_this_month);
 };
 
-class BraveRewardsGetBalanceReportsFunction
-    : public ExtensionFunction {
- public:
-  DECLARE_EXTENSION_FUNCTION("braveRewards.getBalanceReports", UNKNOWN)
-
- protected:
-  ~BraveRewardsGetBalanceReportsFunction() override;
-
-  ResponseAction Run() override;
-
- private:
-  void OnGetBalanceReports(
-      const std::map<std::string,
-      ::brave_rewards::BalanceReport>& reports);
-};
-
 class BraveRewardsGetWalletExistsFunction
     : public ExtensionFunction {
  public:
@@ -438,6 +442,20 @@ class BraveRewardsGetAdsSupportedFunction : public ExtensionFunction {
   ~BraveRewardsGetAdsSupportedFunction() override;
 
   ResponseAction Run() override;
+};
+
+class BraveRewardsGetAnonWalletStatusFunction
+    : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("braveRewards.getAnonWalletStatus", UNKNOWN)
+
+ protected:
+  ~BraveRewardsGetAnonWalletStatusFunction() override;
+
+  ResponseAction Run() override;
+
+ private:
+  void OnGetAnonWalletStatus(const uint32_t result);
 };
 
 }  // namespace api

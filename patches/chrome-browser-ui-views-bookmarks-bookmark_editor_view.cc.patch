@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/views/bookmarks/bookmark_editor_view.cc b/chrome/browser/ui/views/bookmarks/bookmark_editor_view.cc
-index 9d6a177b942768d32f6f7a23d4efb6aff69f1337..c066ff4a4d195a22502640d7f2818b204cfd566a 100644
+index 64121910b194aa23f2bdee0697a2dc3ef885e235..1feba675ee7bdf70361f708d4d74a9bb6dd20eea 100644
 --- a/chrome/browser/ui/views/bookmarks/bookmark_editor_view.cc
 +++ b/chrome/browser/ui/views/bookmarks/bookmark_editor_view.cc
-@@ -491,7 +491,7 @@ BookmarkEditorView::CreateRootNode() {
+@@ -493,7 +493,7 @@ BookmarkEditorView::CreateRootNode() {
        std::make_unique<EditorNode>(base::string16(), 0);
    const BookmarkNode* bb_root_node = bb_model_->root_node();
    CreateNodes(bb_root_node, root_node.get());

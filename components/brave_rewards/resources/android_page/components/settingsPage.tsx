@@ -7,7 +7,7 @@ import { bindActionCreators, Dispatch } from 'redux'
 import { connect } from 'react-redux'
 
 // Components
-import Grant from './grant'
+import Promotion from './promotion'
 import AdsBox from './adsBox'
 import ContributeBox from './contributeBox'
 import TipBox from './tipsBox'
@@ -63,6 +63,14 @@ class SettingsPage extends React.Component<Props, State> {
     this.setState({ walletShown: !this.state.walletShown })
   }
 
+  refreshActions () {
+    this.actions.getBalanceReport(new Date().getMonth() + 1, new Date().getFullYear())
+    this.actions.getContributeList()
+    this.actions.getTransactionHistory()
+    this.actions.getAdsData()
+    this.actions.getExcludedSites()
+  }
+
   componentDidMount () {
     if (this.props.rewardsData.firstLoad === null) {
       // First load ever
@@ -73,8 +81,16 @@ class SettingsPage extends React.Component<Props, State> {
       this.actions.onSettingSave('firstLoad', false)
     }
 
-    if (this.props.rewardsData.adsData.adsEnabled) {
-      this.actions.getTransactionHistory()
+    this.actions.getWalletProperties()
+    this.actions.getBalance()
+    this.balanceTimerId = setInterval(() => {
+      this.actions.getBalance()
+    }, 60000)
+
+    if (this.props.rewardsData.firstLoad === false) {
+      this.refreshActions()
+    } else {
+      this.actions.getAdsData()
     }
 
     this.isWalletUrl()
@@ -92,8 +108,7 @@ class SettingsPage extends React.Component<Props, State> {
       !prevProps.rewardsData.enabledMain &&
       this.props.rewardsData.enabledMain
     ) {
-      this.actions.getContributeList()
-      this.actions.getBalance()
+      this.refreshActions()
     }
 
     if (
@@ -124,23 +139,23 @@ class SettingsPage extends React.Component<Props, State> {
     })
   }
 
-  getGrantClaims = () => {
-    const { grants } = this.props.rewardsData
+  getPromotionsClaim = () => {
+    const { promotions, ui } = this.props.rewardsData
 
-    if (!grants) {
+    if (!promotions) {
       return null
     }
 
     return (
       <>
-        {grants.map((grant?: Rewards.Grant, index?: number) => {
-          if (!grant || !grant.promotionId) {
+        {promotions.map((promotion?: Rewards.Promotion, index?: number) => {
+          if (!promotion || !promotion.promotionId) {
             return null
           }
 
           return (
             <div key={`grant-${index}`}>
-              <Grant grant={grant} />
+              <Promotion promotion={promotion} onlyAnonWallet={ui.onlyAnonWallet} />
             </div>
           )
         })}
@@ -154,8 +169,9 @@ class SettingsPage extends React.Component<Props, State> {
 
   render () {
     const { enabledMain, balance } = this.props.rewardsData
+    const { onlyAnonWallet } = this.props.rewardsData.ui
     const { total } = balance
-    const convertedBalance = utils.convertBalance((total || 0).toString(), balance.rates)
+    const convertedBalance = utils.convertBalance((total || 0), balance.rates)
 
     return (
       <SettingsPageMobile>
@@ -180,13 +196,14 @@ class SettingsPage extends React.Component<Props, State> {
         }
         {
           enabledMain
-          ? this.getGrantClaims()
+          ? this.getPromotionsClaim()
           : null
         }
         <WalletInfoHeader
           onClick={this.onToggleWallet}
           balance={total.toFixed(1).toString()}
           id={'mobile-wallet'}
+          onlyAnonWallet={onlyAnonWallet}
           converted={`${convertedBalance} USD`}
         />
         <AdsBox />

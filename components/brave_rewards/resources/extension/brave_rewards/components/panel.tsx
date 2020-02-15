@@ -62,17 +62,24 @@ export class Panel extends React.Component<Props, State> {
       })
     }
 
-    this.getBalance()
-    this.actions.getGrants()
-    this.actions.getWalletProperties()
-    this.actions.getCurrentReport()
+    chrome.braveRewards.getACEnabled((enabled: boolean) => {
+      this.props.actions.onEnabledAC(enabled)
+    })
+
+    this.actions.fetchPromotions()
+
+    chrome.braveRewards.getBalanceReport(new Date().getMonth() + 1, new Date().getFullYear(),
+      (report: RewardsExtension.BalanceReport) => {
+        this.actions.onBalanceReport(report)
+      })
 
     chrome.braveRewards.getPendingContributionsTotal(((amount: number) => {
       this.actions.OnPendingContributionsTotal(amount)
     }))
 
-    const { externalWallet } = this.props.rewardsPanelData
-    utils.getExternalWallet(this.actions, externalWallet)
+    chrome.braveRewards.getRecurringTips((tips: RewardsExtension.RecurringTips) => {
+      this.props.actions.onRecurringTips(tips)
+    })
   }
 
   componentDidUpdate (prevProps: Props, prevState: State) {
@@ -92,15 +99,8 @@ export class Panel extends React.Component<Props, State> {
     }
 
     if (!prevProps.rewardsPanelData.enabledMain && this.props.rewardsPanelData.enabledMain) {
-      this.getBalance()
-      this.actions.getGrants()
+      this.actions.fetchPromotions()
     }
-  }
-
-  getBalance () {
-    chrome.braveRewards.fetchBalance((balance: RewardsExtension.Balance) => {
-      this.actions.onBalance(balance)
-    })
   }
 
   componentWillUnmount () {
@@ -152,10 +152,13 @@ export class Panel extends React.Component<Props, State> {
     notification = notification && notification.notification
 
     if (notification && notification.id) {
+      this.actions.deleteNotification(notification.id)
       const split = notification.id.split('_')
       const promoId = split[split.length - 1]
       if (promoId) {
-        this.actions.getGrantCaptcha(promoId)
+        chrome.braveRewards.claimPromotion(promoId, (properties: RewardsExtension.Captcha) => {
+          this.actions.onClaimPromotion(properties)
+        })
       }
     }
   }
@@ -167,33 +170,64 @@ export class Panel extends React.Component<Props, State> {
     this.actions.deleteNotification(id)
   }
 
-  onGrantHide = () => {
-    this.actions.onResetGrant()
+  onPromotionHide = (promotionId: string) => {
+    this.actions.resetPromotion(promotionId)
   }
 
-  onFinish = () => {
-    this.actions.onDeleteGrant()
+  onFinish = (promotionId: string) => {
+    this.actions.deletePromotion(promotionId)
   }
 
-  onSolution = (x: number, y: number) => {
-    this.actions.solveGrantCaptcha(x, y)
+  onSolution = (promotionId: string, x: number, y: number) => {
+    let { promotions } = this.props.rewardsPanelData
+    if (!promotionId || !promotions) {
+      return
+    }
+
+    const currentPromotion = promotions.find((promotion: RewardsExtension.Promotion) => promotion.promotionId === promotionId)
+
+    if (!currentPromotion) {
+      return
+    }
+
+    if (!promotionId) {
+      this.actions.promotionFinished(1)
+      return
+    }
+
+    const data = JSON.stringify({
+      captchaId: currentPromotion.captchaId,
+      x: parseInt(x.toFixed(1), 10),
+      y: parseInt(y.toFixed(1), 10)
+    })
+
+    chrome.braveRewards.attestPromotion(promotionId, data, (result: number, promotion?: RewardsExtension.Promotion) => {
+      // if wrong position try again
+      if (result === 6) {
+        chrome.braveRewards.claimPromotion(promotionId, (properties: RewardsExtension.Captcha) => {
+          this.actions.onClaimPromotion(properties)
+        })
+      }
+
+      this.actions.promotionFinished(result, promotion)
+    })
   }
 
   getWalletSummary = () => {
-    const { balance, report } = this.props.rewardsPanelData
+    const { balance, balanceReport } = this.props.rewardsPanelData
     const { rates } = balance
 
     let props = {}
 
-    if (report) {
-      for (let key in report) {
-        const item = report[key]
+    if (balanceReport) {
+      for (let key in balanceReport) {
+        const item = balanceReport[key]
 
-        if (item.length > 1 && key !== 'total') {
-          const tokens = utils.convertProbiToFixed(item)
+        if (item !== 0) {
+          const tokens = item.toFixed(1)
           props[key] = {
             tokens,
-            converted: utils.convertBalance(tokens, rates)
+            converted: utils.convertBalance(item, rates)
           }
         }
       }
@@ -303,6 +337,7 @@ export class Panel extends React.Component<Props, State> {
 
   getNotification = () => {
     const { notifications, currentNotification } = this.props.rewardsPanelData
+    const { onlyAnonWallet } = this.props
 
     if (
       currentNotification === undefined ||
@@ -335,8 +370,9 @@ export class Panel extends React.Component<Props, State> {
         // 16 - error while tipping
 
         if (result === '0') {
-          const fixed = utils.convertProbiToFixed(notification.args[3])
-          text = getMessage('contributeNotificationSuccess', [fixed])
+          const currency = onlyAnonWallet ? getMessage('bap') : getMessage('bat')
+          const contributionAmount = utils.handleContributionAmount(notification.args[3])
+          text = getMessage('contributeNotificationSuccess', [contributionAmount, currency])
         } else if (result === '15') {
           text = getMessage('contributeNotificationNotEnoughFunds')
           isAlert = 'warning'
@@ -454,7 +490,7 @@ export class Panel extends React.Component<Props, State> {
   }
 
   onContributionAmountChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newValue = parseInt(event.target.value, 10)
+    const newValue = parseFloat(event.target.value)
     const publisher: RewardsExtension.Publisher | undefined = this.getPublisher()
 
     if (!publisher || !publisher.publisher_key) {
@@ -471,23 +507,32 @@ export class Panel extends React.Component<Props, State> {
   }
 
   generateAmounts = (publisher?: RewardsExtension.Publisher) => {
-    const { tipAmounts } = this.props.rewardsPanelData
+    const { tipAmounts, walletProperties } = this.props.rewardsPanelData
     const { rates } = this.props.rewardsPanelData.balance
 
     const publisherKey = publisher && publisher.publisher_key
-    const initialAmounts = (
-      !publisherKey ||
-      !tipAmounts ||
-      !tipAmounts[publisherKey] ||
-      tipAmounts[publisherKey].length === 0
-    ) ? this.defaultTipAmounts : tipAmounts[publisherKey]
+    let publisherAmounts = null
+    if (publisherKey && tipAmounts && tipAmounts[publisherKey] && tipAmounts[publisherKey].length) {
+      publisherAmounts = tipAmounts[publisherKey]
+    }
+
+    // Prefer the publisher amounts, then the wallet's defaults. Fall back to defaultTipAmounts.
+    let initialAmounts = this.defaultTipAmounts
+    if (publisherAmounts) {
+      initialAmounts = publisherAmounts
+    } else if (walletProperties) {
+      const walletAmounts = walletProperties.defaultMonthlyTipChoices
+      if (walletAmounts.length) {
+        initialAmounts = walletAmounts
+      }
+    }
 
     const amounts = [0, ...initialAmounts]
 
     return amounts.map((value: number) => {
       return {
         tokens: value.toFixed(1),
-        converted: utils.convertBalance(value.toString(), rates),
+        converted: utils.convertBalance(value, rates),
         selected: false
       }
     })
@@ -584,9 +629,17 @@ export class Panel extends React.Component<Props, State> {
       return false
     }
 
-    const hasAnonBalance = wallets['anonymous'] && wallets['anonymous'] > 0
+    let nonUserFunds = 0
 
-    return connected && !hasAnonBalance
+    if (wallets['anonymous']) {
+      nonUserFunds += wallets['anonymous']
+    }
+
+    if (wallets['blinded']) {
+      nonUserFunds += wallets['blinded']
+    }
+
+    return connected && nonUserFunds === 0
   }
 
   getActions = () => {
@@ -607,23 +660,40 @@ export class Panel extends React.Component<Props, State> {
     }])
   }
 
+  getCurrentPromotion = (onlyAnonWallet: boolean) => {
+    const { promotions } = this.props.rewardsPanelData
+
+    if (!promotions) {
+      return undefined
+    }
+
+    let currentPromotion = promotions.filter((promotion: RewardsExtension.Promotion) => {
+      return promotion.captchaStatus !== null
+    })
+
+    if (currentPromotion.length === 0) {
+      return undefined
+    }
+
+    return utils.getPromotion(currentPromotion[0], onlyAnonWallet)
+  }
+
   render () {
-    const { pendingContributionTotal, enabledAC, externalWallet, balance } = this.props.rewardsPanelData
+    const { pendingContributionTotal, enabledAC, externalWallet, balance, promotions } = this.props.rewardsPanelData
     const { rates } = this.props.rewardsPanelData.balance
-    const { grants } = this.props.rewardsPanelData.walletProperties
     const publisher: RewardsExtension.Publisher | undefined = this.getPublisher()
     const total = balance.total || 0
-    const converted = utils.convertBalance(total.toString(), rates)
+    const converted = utils.convertBalance(total, rates)
     const notification = this.getNotification()
     const notificationId = this.getNotificationProp('id', notification)
     const notificationType = this.getNotificationProp('type', notification)
     const notificationClick = this.getNotificationClickEvent(notificationType, notificationId)
-    let { currentGrant } = this.props.rewardsPanelData
     const defaultContribution = this.getContribution(publisher)
     const checkmark = publisher && utils.isPublisherConnectedOrVerified(publisher.status)
     const tipAmounts = defaultContribution !== '0.0'
       ? this.generateAmounts(publisher)
       : undefined
+    const { onlyAnonWallet } = this.props
 
     if (notification &&
         notification.notification &&
@@ -642,7 +712,7 @@ export class Panel extends React.Component<Props, State> {
       }
     }
 
-    currentGrant = utils.getGrant(currentGrant)
+    let currentPromotion = this.getCurrentPromotion(onlyAnonWallet)
 
     let walletStatus: WalletState | undefined = undefined
     let onVerifyClick = undefined
@@ -661,13 +731,12 @@ export class Panel extends React.Component<Props, State> {
         actions={this.getActions()}
         showCopy={false}
         showSecActions={false}
-        grant={currentGrant}
-        onGrantHide={this.onGrantHide}
+        grant={currentPromotion}
+        onGrantHide={this.onPromotionHide}
         onNotificationClick={notificationClick}
         onSolution={this.onSolution}
         onFinish={this.onFinish}
-        convertProbiToFixed={utils.convertProbiToFixed}
-        grants={utils.getGrants(grants)}
+        grants={utils.generatePromotions(promotions)}
         walletState={walletStatus}
         onVerifyClick={onVerifyClick}
         onDisconnectClick={this.onDisconnectClick}
@@ -704,6 +773,7 @@ export class Panel extends React.Component<Props, State> {
               refreshingPublisher={this.state.refreshingPublisher}
               publisherRefreshed={this.state.publisherRefreshed}
               setMonthlyAction={this.showTipSiteDetail.bind(this, true)}
+              onlyAnonWallet={onlyAnonWallet}
             />
             : null
           }

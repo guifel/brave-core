@@ -13,8 +13,10 @@
 #include "base/strings/string_split.h"
 #include "base/strings/stringprintf.h"
 #include "base/memory/weak_ptr.h"
+#include "base/test/bind_test_util.h"
 #include "bat/ledger/internal/bat_helper.h"
 #include "bat/ledger/internal/uphold/uphold_util.h"
+#include "bat/ledger/internal/request/request_util.h"
 #include "bat/ledger/internal/static_values.h"
 #include "bat/ledger/ledger.h"
 #include "brave/browser/extensions/api/brave_action_api.h"
@@ -31,6 +33,8 @@
 #include "brave/components/brave_ads/common/pref_names.h"
 #include "brave/components/brave_ads/browser/locale_helper_mock.h"
 #include "brave/components/brave_ads/browser/notification_helper_mock.h"
+#include "brave/browser/ui/views/brave_actions/brave_actions_container.h"
+#include "brave/browser/ui/views/location_bar/brave_location_bar_view.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/common/chrome_constants.h"
@@ -53,7 +57,7 @@
 using ::testing::NiceMock;
 using ::testing::Return;
 
-using braveledger_bat_helper::SERVER_TYPES;
+using braveledger_request_util::ServerTypes;
 
 using RewardsNotificationType =
     brave_rewards::RewardsNotificationService::RewardsNotificationType;
@@ -126,28 +130,25 @@ std::unique_ptr<net::test_server::HttpResponse> HandleRequest(
 bool URLMatches(const std::string& url,
                 const std::string& path,
                 const std::string& prefix,
-                const SERVER_TYPES& server) {
+                const ServerTypes& server) {
   const std::string target_url =
-      braveledger_bat_helper::buildURL(path, prefix, server);
+      braveledger_request_util::BuildUrl(path, prefix, server);
   return (url.find(target_url) == 0);
 }
+
+enum class ContributionType { OneTimeTip, MonthlyTip };
 
 }  // namespace
 
 namespace brave_test_resp {
   std::string registrarVK_;
   std::string verification_;
-  std::string grant_;
-  std::string grant_v4_;
+  std::string promotions_;
+  std::string promotion_claim_;
+  std::string promotion_tokens_;
   std::string captcha_;
-  std::string captcha_solution_;
-  std::string contribution_;
-  std::string reconcile_;
-  std::string current_reconcile_;
-  std::string register_;
-  std::string register_credential_;
-  std::string surveyor_voting_;
-  std::string surveyor_voting_credential_;
+  std::string wallet_properties_;
+  std::string wallet_properties_defaults_;
   std::string uphold_auth_resp_;
   std::string uphold_transactions_resp_;
   std::string uphold_commit_resp_;
@@ -229,52 +230,16 @@ class BraveRewardsBrowserTest
     loop.RunUntilIdle();
   }
 
-  PrefService* GetPrefs() {
+  PrefService* GetPrefs() const {
     return browser()->profile()->GetPrefs();
   }
 
-  bool IsRewardsEnabled() {
+  bool IsRewardsEnabled() const {
     return GetPrefs()->GetBoolean(brave_rewards::prefs::kBraveRewardsEnabled);
   }
 
   bool IsAdsEnabled() {
     return ads_service_->IsEnabled();
-  }
-
-  std::string GetWalletProperties() {
-    return
-    "{"
-      "\"altcurrency\": \"BAT\","
-      "\"probi\": \"0\","
-      "\"balance\": \"" + GetAnonBalance() + ".0000\","
-      "\"unconfirmed\": \"0.0000\","
-      "\"rates\": {"
-        "\"BTC\": 0.00003105,"
-        "\"ETH\": 0.0007520713830465265,"
-        "\"XRP\": 0.6385015608740894,"
-        "\"BCH\": 0.000398527449465635,"
-        "\"LTC\": 0.003563298490127758,"
-        "\"DASH\": 0.0011736801836266257,"
-        "\"BTG\": 0.009819171067370777,"
-        "\"USD\": 0.214100307359946,"
-        "\"EUR\": 0.18357217273398782"
-      "},"
-      "\"parameters\": {"
-        "\"adFree\": {"
-          "\"currency\": \"BAT\","
-          "\"fee\": {"
-            "\"BAT\": 20"
-          "},"
-          "\"choices\": {"
-            "\"BAT\": [10,15,20,30,50,100]"
-          "},"
-          "\"range\": {"
-            "\"BAT\": [10,100]"
-          "},"
-          "\"days\": 30"
-        "}"
-      "}"
-    "}";
   }
 
   std::string GetUpholdCard() {
@@ -311,80 +276,97 @@ class BraveRewardsBrowserTest
       verified.c_str());
   }
 
+  std::vector<double> GetSiteBannerTipOptions(
+      content::WebContents* site_banner) {
+    WaitForSelector(site_banner, "[data-test-id=amount-wrapper] div span");
+    auto options = content::EvalJs(
+        site_banner,
+        R"(
+            const delay = t => new Promise(resolve => setTimeout(resolve, t));
+            delay(500).then(() => Array.prototype.map.call(
+                document.querySelectorAll(
+                    "[data-test-id=amount-wrapper] div span"),
+                node => parseFloat(node.innerText)))
+        )",
+        content::EXECUTE_SCRIPT_DEFAULT_OPTIONS,
+        content::ISOLATED_WORLD_ID_CONTENT_END).ExtractList();
+
+    std::vector<double> result;
+    for (const auto& value : options.GetList()) {
+      result.push_back(value.GetDouble());
+    }
+    return result;
+  }
+
+  static std::vector<double> GetRewardsPopupTipOptions(
+      content::WebContents* popup) {
+    auto options = content::EvalJs(
+        popup,
+        R"_(
+          const delay = t => new Promise(resolve => setTimeout(resolve, t));
+          delay(0).then(() =>
+              Array.prototype.map.call(
+                  document.querySelectorAll("option:not(:disabled)"),
+                  node => parseFloat(node.value)))
+        )_",
+        content::EXECUTE_SCRIPT_DEFAULT_OPTIONS,
+        content::ISOLATED_WORLD_ID_CONTENT_END).ExtractList();
+
+    std::vector<double> result;
+    for (const auto& value : options.GetList()) {
+      result.push_back(value.GetDouble());
+    }
+    return result;
+  }
+
+
   void GetTestResponse(const std::string& url,
                        int32_t method,
                        int* response_status_code,
                        std::string* response,
                        std::map<std::string, std::string>* headers) {
+    request_made_ = true;
     std::vector<std::string> tmp = base::SplitString(url,
                                                      "/",
                                                      base::TRIM_WHITESPACE,
                                                      base::SPLIT_WANT_ALL);
-    if (url.find(braveledger_bat_helper::buildURL(REGISTER_PERSONA, PREFIX_V2,
-      braveledger_bat_helper::SERVER_TYPES::LEDGER)) == 0
-      && tmp.size() == 6) {
+    const std::string persona_url =
+        braveledger_request_util::BuildUrl(REGISTER_PERSONA, PREFIX_V2);
+    if (url.find(persona_url) == 0 && tmp.size() == 6) {
       *response = brave_test_resp::registrarVK_;
     } else if (URLMatches(url, REGISTER_PERSONA, PREFIX_V2,
-                          SERVER_TYPES::LEDGER) &&
+                          ServerTypes::LEDGER) &&
                tmp.size() == 7) {
       *response = brave_test_resp::verification_;
     } else if (URLMatches(url, WALLET_PROPERTIES, PREFIX_V2,
-                          SERVER_TYPES::BALANCE)) {
-      *response = GetWalletProperties();
-    } else if (URLMatches(url, WALLET_PROPERTIES, PREFIX_V2,
-                          SERVER_TYPES::LEDGER)) {
-      GURL gurl(url);
-      if (gurl.has_query()) {
-        *response = brave_test_resp::reconcile_;
+                          ServerTypes::BALANCE)) {
+      if (show_defaults_in_properties_) {
+        *response = brave_test_resp::wallet_properties_defaults_;
       } else {
-        if (ac_low_amount_) {
-          *response = "";
-          *response_status_code = net::HTTP_REQUESTED_RANGE_NOT_SATISFIABLE;
-        } else {
-          *response = brave_test_resp::current_reconcile_;
-        }
+        *response = brave_test_resp::wallet_properties_;
       }
-
-    } else if (URLMatches(url, GET_SET_PROMOTION, PREFIX_V2,
-                          SERVER_TYPES::LEDGER)) {
-      GURL gurl(url);
-      if (gurl.has_query())
-        *response = brave_test_resp::grant_;
-      else
-        *response = brave_test_resp::captcha_solution_;
-    } else if (URLMatches(url, GET_SET_PROMOTION, PREFIX_V4,
-                          SERVER_TYPES::LEDGER)) {
-      *response = brave_test_resp::grant_v4_;
-    } else if (URLMatches(url, GET_PROMOTION_CAPTCHA, PREFIX_V4,
-                          SERVER_TYPES::LEDGER)) {
-      // The hint we use doesn't matter since we mock the server's
-      // responses anyway, but ledger verifies that the response headers contain
-      // a hint so we must add one
-      (*headers)["captcha-hint"] = "Triangle";
+    } else if (URLMatches(url, "/promotions?", PREFIX_V1,
+                          ServerTypes::kPromotion)) {
+      *response = brave_test_resp::promotions_;
+    } else if (URLMatches(url, "/promotions/", PREFIX_V1,
+                          ServerTypes::kPromotion)) {
+      if (url.find("claims") != std::string::npos) {
+        *response = brave_test_resp::promotion_tokens_;
+      } else {
+        *response = brave_test_resp::promotion_claim_;
+      }
+    } else if (URLMatches(url, "/captchas", PREFIX_V1,
+                          ServerTypes::kPromotion)) {
       *response = brave_test_resp::captcha_;
-    } else if (URLMatches(url, RECONCILE_CONTRIBUTION, PREFIX_V2,
-                          SERVER_TYPES::LEDGER)) {
-      first_url_ac_called_ = true;
-      *response = brave_test_resp::contribution_;
-    } else if (URLMatches(url, REGISTER_VIEWING, PREFIX_V2,
-                          SERVER_TYPES::LEDGER)) {
-      if (url.find(REGISTER_VIEWING "/") != std::string::npos)
-        *response = brave_test_resp::register_credential_;
-      else
-        *response = brave_test_resp::register_;
-    } else if (URLMatches(url, SURVEYOR_BATCH_VOTING, PREFIX_V2,
-                          SERVER_TYPES::LEDGER)) {
-      if (url.find(SURVEYOR_BATCH_VOTING "/") != std::string::npos)
-        *response = brave_test_resp::surveyor_voting_credential_;
-      else
-        *response = brave_test_resp::surveyor_voting_;
     } else if (URLMatches(url, GET_PUBLISHERS_LIST, "",
-                          SERVER_TYPES::PUBLISHER_DISTRO)) {
+                          ServerTypes::PUBLISHER_DISTRO)) {
       if (alter_publisher_list_) {
         *response =
             "["
             "[\"bumpsmack.com\",\"publisher_verified\",false,\"address1\",{}],"
-            "[\"duckduckgo.com\",\"wallet_connected\",false,\"address2\",{}]"
+            "[\"duckduckgo.com\",\"wallet_connected\",false,\"address2\",{}],"
+            "[\"laurenwags.github.io\",\"wallet_connected\",false,\"address2\","
+              "{\"donationAmounts\": [5,10,20]}]"
             "]";
       } else {
         *response =
@@ -394,7 +376,9 @@ class BraveRewardsBrowserTest
             "[\"3zsistemi.si\",\"wallet_connected\",false,\"address3\",{}],"
             "[\"site1.com\",\"wallet_connected\",false,\"address4\",{}],"
             "[\"site2.com\",\"wallet_connected\",false,\"address5\",{}],"
-            "[\"site3.com\",\"wallet_connected\",false,\"address6\",{}]"
+            "[\"site3.com\",\"wallet_connected\",false,\"address6\",{}],"
+            "[\"laurenwags.github.io\",\"wallet_connected\",false,\"address2\","
+              "{\"donationAmounts\": [5,10,20]}]"
             "]";
       }
     } else if (base::StartsWith(
@@ -435,25 +419,18 @@ class BraveRewardsBrowserTest
     wait_for_wallet_initialization_loop_->Run();
   }
 
-  void WaitForGrantInitialization() {
-    if (grant_initialized_)
+  void WaitForPromotionInitialization() {
+    if (promotion_initialized_)
       return;
-    wait_for_grant_initialization_loop_.reset(new base::RunLoop);
-    wait_for_grant_initialization_loop_->Run();
+    wait_for_promotion_initialization_loop_.reset(new base::RunLoop);
+    wait_for_promotion_initialization_loop_->Run();
   }
 
-  void WaitForGrantFinished() {
-    if (grant_finished_)
+  void WaitForPromotionFinished() {
+    if (promotion_finished_)
       return;
-    wait_for_grant_finished_loop_.reset(new base::RunLoop);
-    wait_for_grant_finished_loop_->Run();
-  }
-
-  void WaitForCaptcha() {
-    if (captcha_received_)
-      return;
-    wait_for_captcha_loop_.reset(new base::RunLoop);
-    wait_for_captcha_loop_->Run();
+    wait_for_promotion_finished_loop_.reset(new base::RunLoop);
+    wait_for_promotion_finished_loop_->Run();
   }
 
   void WaitForPublisherListNormalized() {
@@ -479,6 +456,14 @@ class BraveRewardsBrowserTest
     wait_for_tip_completed_loop_->Run();
   }
 
+  void WaitForPendingTipToBeSaved() {
+    if (pending_tip_saved_) {
+      return;
+    }
+    wait_for_pending_tip_saved_loop_.reset(new base::RunLoop);
+    wait_for_pending_tip_saved_loop_->Run();
+  }
+
   void WaitForMultipleTipReconcileCompleted(int32_t needed) {
     multiple_tip_reconcile_needed_ = needed;
     if (multiple_tip_reconcile_completed_) {
@@ -495,6 +480,14 @@ class BraveRewardsBrowserTest
     }
     wait_for_insufficient_notification_loop_.reset(new base::RunLoop);
     wait_for_insufficient_notification_loop_->Run();
+  }
+
+  void WaitForRecurringTipToBeSaved() {
+    if (recurring_tip_saved_) {
+      return;
+    }
+    wait_for_recurring_tip_saved_loop_.reset(new base::RunLoop);
+    wait_for_recurring_tip_saved_loop_->Run();
   }
 
   void WaitForSelector(content::WebContents* contents,
@@ -525,6 +518,76 @@ class BraveRewardsBrowserTest
     ASSERT_TRUE(js_result.ExtractBool());
   }
 
+  void DragAndDrop(
+      content::WebContents* contents,
+      const std::string& drag_selector,
+      const std::string& drop_selector) {
+    const std::string js_code = base::StringPrintf(
+        R"(
+					var triggerDragAndDrop = function (selectorDrag, selectorDrop) {
+
+					  // function for triggering mouse events
+					  var fireMouseEvent = function (type, elem, centerX, centerY) {
+					    var evt = document.createEvent('MouseEvents');
+					    evt.initMouseEvent(type, true, true, window, 1, 1, 1, centerX,
+					                       centerY, false, false, false, false, 0, elem);
+					    elem.dispatchEvent(evt);
+					  };
+
+					  // fetch target elements
+					  var elemDrag = document.querySelector(selectorDrag);
+					  var elemDrop = document.querySelector(selectorDrop);
+					  if (!elemDrag || !elemDrop) return false;
+
+					  // calculate positions
+					  var pos = elemDrag.getBoundingClientRect();
+					  var center1X = Math.floor((pos.left + pos.right) / 2);
+					  var center1Y = Math.floor((pos.top + pos.bottom) / 2);
+					  pos = elemDrop.getBoundingClientRect();
+					  var center2X = Math.floor((pos.left + pos.right) / 2);
+					  var center2Y = Math.floor((pos.top + pos.bottom) / 2);
+
+					  // mouse over dragged element and mousedown
+					  fireMouseEvent('mousemove', elemDrag, center1X, center1Y);
+					  fireMouseEvent('mouseenter', elemDrag, center1X, center1Y);
+					  fireMouseEvent('mouseover', elemDrag, center1X, center1Y);
+					  fireMouseEvent('mousedown', elemDrag, center1X, center1Y);
+
+					  // start dragging process over to drop target
+					  fireMouseEvent('dragstart', elemDrag, center1X, center1Y);
+					  fireMouseEvent('drag', elemDrag, center1X, center1Y);
+					  fireMouseEvent('mousemove', elemDrag, center1X, center1Y);
+					  fireMouseEvent('drag', elemDrag, center2X, center2Y);
+					  fireMouseEvent('mousemove', elemDrop, center2X, center2Y);
+
+					  // trigger dragging process on top of drop target
+					  fireMouseEvent('mouseenter', elemDrop, center2X, center2Y);
+					  fireMouseEvent('dragenter', elemDrop, center2X, center2Y);
+					  fireMouseEvent('mouseover', elemDrop, center2X, center2Y);
+					  fireMouseEvent('dragover', elemDrop, center2X, center2Y);
+
+					  // release dragged element on top of drop target
+					  fireMouseEvent('drop', elemDrop, center2X, center2Y);
+					  fireMouseEvent('dragend', elemDrag, center2X, center2Y);
+					  fireMouseEvent('mouseup', elemDrag, center2X, center2Y);
+
+					  return true;
+					};
+
+					triggerDragAndDrop(
+						'%s',
+						'%s')
+        )",
+        drag_selector.c_str(),
+        drop_selector.c_str());
+    content::EvalJsResult jsResult = EvalJs(
+        contents,
+        js_code,
+        content::EXECUTE_SCRIPT_NO_RESOLVE_PROMISES,
+        content::ISOLATED_WORLD_ID_CONTENT_END);
+    ASSERT_TRUE(jsResult.ExtractBool());
+  }
+
   void WaitForBraveAdsHaveArrivedNotification() {
     if (brave_ads_have_arrived_notification_was_already_shown_) {
       return;
@@ -544,7 +607,7 @@ class BraveRewardsBrowserTest
       {"BraveAdsLocaleIsSupported", "en_US"},
       {"BraveAdsLocaleIsNotSupported", "en_XX"},
       {"BraveAdsLocaleIsNewlySupported", "ja_JP"},
-      {"BraveAdsLocaleIsNewlySupportedForLatestSchemaVersion", "en_KY"},
+      {"BraveAdsLocaleIsNewlySupportedForLatestSchemaVersion", newly_supported_locale_},  // NOLINT
       {"BraveAdsLocaleIsNotNewlySupported", "en_XX"},
       {"PRE_AutoEnableAdsForSupportedLocales", "en_US"},
       {"AutoEnableAdsForSupportedLocales", "en_US"},
@@ -575,14 +638,32 @@ class BraveRewardsBrowserTest
       return;
     }
 
-    const std::string supported_locale_parameter = parameters.at(1);
-    ASSERT_TRUE(!supported_locale_parameter.empty());
+    const ::testing::TestInfo* const test_info =
+        ::testing::UnitTest::GetInstance()->current_test_info();
+    ASSERT_NE(nullptr, test_info);
+    const std::string test_name = test_info->name();
+
+    const std::string newly_supported_locale_parameter = parameters.at(2);
+    ASSERT_TRUE(!newly_supported_locale_parameter.empty());
 
     std::string locale;
-    if (supported_locale_parameter == "ForSupportedLocale") {
-      locale = "en_US";
+    if (test_name.find("PRE_UpgradePath") == 0) {
+      if (newly_supported_locale_parameter == "ForNewlySupportedLocale") {
+        locale = newly_supported_locale_;
+      } else {
+        locale = "en_US";
+      }
     } else {
-      locale = "en_XX";
+      const std::string supported_locale_parameter = parameters.at(1);
+      ASSERT_TRUE(!supported_locale_parameter.empty());
+
+      if (newly_supported_locale_parameter == "ForNewlySupportedLocale") {
+        locale = newly_supported_locale_;
+      } else if (supported_locale_parameter == "ForSupportedLocale") {
+        locale = "en_US";
+      } else {
+        locale = "en_XX";
+      }
     }
 
     MockLocaleHelper(locale);
@@ -649,20 +730,21 @@ class BraveRewardsBrowserTest
     //   1 = Parameters
 
     const std::string name = test_name_components.at(0);
-    if (name != "UpgradePath") {
+    if (name != "UpgradePath" && name != "PRE_UpgradePath") {
       return false;
     }
 
     // parameters:
     //   0 = Preferences
     //   1 = Supported locale
-    //   2 = Rewards enabled
-    //   3 = Ads enabled
-    //   4 = Should show notification
+    //   2 = Newly supported locale
+    //   3 = Rewards enabled
+    //   4 = Ads enabled
+    //   5 = Should show notification
 
     *parameters = base::SplitString(test_name_components.at(1), "_",
         base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
-    EXPECT_EQ(5UL, parameters->size());
+    EXPECT_EQ(6UL, parameters->size());
 
     return true;
   }
@@ -740,30 +822,61 @@ class BraveRewardsBrowserTest
           base::Unretained(this)));
   }
 
-  content::WebContents* OpenRewardsPopup() const {
-    // Construct an observer to wait for the popup to load
-    content::WindowedNotificationObserver popup_observer(
-        content::NOTIFICATION_LOAD_COMPLETED_MAIN_FRAME,
-        content::NotificationService::AllSources());
-
+  void OpenRewardsPopupRewardsEnabled() const {
     // Ask the popup to open
     std::string error;
     bool popup_shown = extensions::BraveActionAPI::ShowActionUI(
       browser(), brave_rewards_extension_id, nullptr, &error);
-    if (!popup_shown)
+    if (!popup_shown) {
       LOG(ERROR) << "Could not open rewards popup: " << error;
+    }
     EXPECT_TRUE(popup_shown);
+  }
+
+  void OpenRewardsPopupRewardsDisabled() const {
+    BrowserView* browser_view =
+      BrowserView::GetBrowserViewForBrowser(browser());
+    BraveLocationBarView* brave_location_bar_view =
+        static_cast<BraveLocationBarView*>(browser_view->GetLocationBarView());
+    ASSERT_NE(brave_location_bar_view, nullptr);
+    auto* brave_actions = brave_location_bar_view->brave_actions_;
+    ASSERT_NE(brave_actions, nullptr);
+
+    brave_actions->OnRewardsStubButtonClicked();
+  }
+
+  content::WebContents* OpenRewardsPopup() const {
+    // Construct an observer to wait for the popup to load
+    content::WebContents* popup_contents = nullptr;
+    auto check_load_is_rewards_panel =
+        [&](const content::NotificationSource& source,
+            const content::NotificationDetails&) -> bool {
+          auto web_contents_source =
+              static_cast<const content::Source<content::WebContents>&>(source);
+          popup_contents = web_contents_source.ptr();
+
+          // Check that this notification is for the Rewards panel and not, say,
+          // the extension background page.
+          std::string url = popup_contents->GetLastCommittedURL().spec();
+          std::string rewards_panel_url = std::string("chrome-extension://") +
+              brave_rewards_extension_id + "/brave_rewards_panel.html";
+          return url == rewards_panel_url;
+        };
+     content::WindowedNotificationObserver popup_observer(
+         content::NOTIFICATION_LOAD_COMPLETED_MAIN_FRAME,
+         base::BindLambdaForTesting(check_load_is_rewards_panel));
+
+    if (IsRewardsEnabled()) {
+      OpenRewardsPopupRewardsEnabled();
+    } else {
+      OpenRewardsPopupRewardsDisabled();
+    }
 
     // Wait for the popup to load
     popup_observer.Wait();
+    WaitForSelector(popup_contents, "[data-test-id='rewards-panel']");
 
-    // Retrieve the notification source
-    const auto& source =
-        static_cast<const content::Source<content::WebContents>&>(
-            popup_observer.source());
-
-    WaitForSelector(source.ptr(), "#panel-slider");
-    return source.ptr();
+    return popup_contents;
   }
 
   void GetTestDataDir(base::FilePath* test_data_dir) {
@@ -784,35 +897,23 @@ class BraveRewardsBrowserTest
         base::ReadFileToString(path.AppendASCII("verify_persona_resp.json"),
                                &brave_test_resp::verification_));
 
-    ASSERT_TRUE(base::ReadFileToString(path.AppendASCII("ugp_grant_resp.json"),
-                                       &brave_test_resp::grant_));
-    ASSERT_TRUE(
-        base::ReadFileToString(path.AppendASCII("ugp_grant_v4_resp.json"),
-                               &brave_test_resp::grant_v4_));
-    ASSERT_TRUE(base::ReadFileToString(path.AppendASCII("captcha_resp.png"),
+    ASSERT_TRUE(base::ReadFileToString(path.AppendASCII("promotions_resp.json"),
+                                       &brave_test_resp::promotions_));
+
+    ASSERT_TRUE(base::ReadFileToString(path.AppendASCII("captcha_resp.json"),
                                        &brave_test_resp::captcha_));
     ASSERT_TRUE(
-        base::ReadFileToString(path.AppendASCII("captcha_solution_resp.json"),
-                               &brave_test_resp::captcha_solution_));
+        base::ReadFileToString(path.AppendASCII("promotion_claim_resp.json"),
+                               &brave_test_resp::promotion_claim_));
     ASSERT_TRUE(
-        base::ReadFileToString(path.AppendASCII("contribution_resp.json"),
-                               &brave_test_resp::contribution_));
-    ASSERT_TRUE(base::ReadFileToString(path.AppendASCII("reconcile_resp.json"),
-                                       &brave_test_resp::reconcile_));
+        base::ReadFileToString(path.AppendASCII("promotion_tokens_resp.json"),
+                               &brave_test_resp::promotion_tokens_));
     ASSERT_TRUE(
-        base::ReadFileToString(path.AppendASCII("current_reconcile_resp.json"),
-                               &brave_test_resp::current_reconcile_));
-    ASSERT_TRUE(base::ReadFileToString(path.AppendASCII("register_resp.json"),
-                                       &brave_test_resp::register_));
+        base::ReadFileToString(path.AppendASCII("wallet_properties_resp.json"),
+                               &brave_test_resp::wallet_properties_));
     ASSERT_TRUE(base::ReadFileToString(
-        path.AppendASCII("register_credential_resp.json"),
-        &brave_test_resp::register_credential_));
-    ASSERT_TRUE(
-        base::ReadFileToString(path.AppendASCII("surveyor_voting_resp.json"),
-                               &brave_test_resp::surveyor_voting_));
-    ASSERT_TRUE(base::ReadFileToString(
-        path.AppendASCII("surveyor_voting_credential_resp.json"),
-        &brave_test_resp::surveyor_voting_credential_));
+        path.AppendASCII("wallet_properties_resp_defaults.json"),
+        &brave_test_resp::wallet_properties_defaults_));
     ASSERT_TRUE(base::ReadFileToString(
         path.AppendASCII("uphold_auth_resp.json"),
         &brave_test_resp::uphold_auth_resp_));
@@ -858,7 +959,7 @@ class BraveRewardsBrowserTest
     return BalanceDoubleToString(external_balance_);
   }
 
-  std::string GetAnonBalance() {
+  std::string GetAnonBalance() const {
     return BalanceDoubleToString(balance_);
   }
 
@@ -912,26 +1013,45 @@ class BraveRewardsBrowserTest
     ASSERT_TRUE(jsResult.ExtractBool());
   }
 
+  void EnableRewardsViaCode() {
+    base::RunLoop run_loop;
+    bool wallet_created = false;
+    rewards_service_->CreateWallet(
+        base::BindLambdaForTesting([&](int32_t result) {
+          wallet_created =
+              (result == static_cast<int32_t>(ledger::Result::WALLET_CREATED));
+          run_loop.Quit();
+        }));
+
+    run_loop.Run();
+
+    ads_service_->SetEnabled(
+        wallet_created && ads_service_->IsSupportedLocale());
+    ASSERT_TRUE(wallet_created);
+    ASSERT_TRUE(IsRewardsEnabled());
+  }
+
   brave_rewards::RewardsServiceImpl* rewards_service() {
     return rewards_service_;
   }
 
-  void ClaimGrant(bool use_panel) {
-    // Wait for grant to initialize
-    WaitForGrantInitialization();
+  void ClaimPromotion(bool use_panel) {
+    // Wait for promotion to initialize
+    WaitForPromotionInitialization();
 
     // Use the appropriate WebContents
-    content::WebContents* contents =
+    content::WebContents *contents =
         use_panel ? OpenRewardsPopup() : BraveRewardsBrowserTest::contents();
     ASSERT_TRUE(contents);
 
-    // Claim grant via settings page or panel, as instructed
+    // Claim promotion via settings page or panel, as instructed
     if (use_panel) {
       ASSERT_TRUE(ExecJs(contents,
                          "document.getElementsByTagName('button')[0].click();",
                          content::EXECUTE_SCRIPT_DEFAULT_OPTIONS,
                          content::ISOLATED_WORLD_ID_CONTENT_END));
     } else {
+      WaitForSelector(contents, "[data-test-id='claimGrant']");
       ASSERT_TRUE(ExecJs(
           contents,
           "document.querySelector(\"[data-test-id='claimGrant']\").click();",
@@ -940,25 +1060,29 @@ class BraveRewardsBrowserTest
     }
 
     // Wait for CAPTCHA
-    WaitForCaptcha();
+    WaitForSelector(contents, "[data-test-id='captcha']");
 
-    // Solve the CAPTCHA (response is mocked, so the contents of the
-    // solution aren't important)
-    const std::string promotion_id = "d9033f51-6d83-4d19-a016-1c11f693f147";
-    rewards_service_->SolveGrantCaptcha("{\"x\":1,\"y\":1}", promotion_id);
+    DragAndDrop(
+        contents,
+        "[data-test-id=\"captcha-triangle\"]",
+        "[data-test-id=\"captcha-drop\"]");
 
-    // Wait for grant to finish
-    WaitForGrantFinished();
+    WaitForPromotionFinished();
 
-    // Ensure that grant looks as expected
-    EXPECT_STREQ(grant_.altcurrency.c_str(), "BAT");
-    EXPECT_STREQ(grant_.probi.c_str(), "30000000000000000000");
-    EXPECT_STREQ(grant_.promotionId.c_str(), promotion_id.c_str());
-    EXPECT_STREQ(grant_.type.c_str(), "ugp");
+    // Ensure that promotion looks as expected
+    const std::string promotion_id = "6820f6a4-c6ef-481d-879c-d2c30c8928c3";
+    EXPECT_STREQ(std::to_string(promotion_.amount).c_str(), "30.000000");
+    EXPECT_STREQ(promotion_.promotion_id.c_str(), promotion_id.c_str());
+    EXPECT_EQ(promotion_.type, 0u);
+    EXPECT_EQ(promotion_.expires_at, 1740816427ull);
+    balance_ += 30;
 
-    // Check that grant notification shows the appropriate amount
+    // Check that promotion notification shows the appropriate amount
     const std::string selector =
         use_panel ? "[id='root']" : "[data-test-id='newTokenGrant']";
+
+    WaitForSelector(contents, selector);
+
     content::EvalJsResult js_result = EvalJs(
         contents,
         content::JsReplace(
@@ -972,7 +1096,7 @@ class BraveRewardsBrowserTest
               std::string::npos);
     EXPECT_NE(js_result.ExtractString().find("30.0 BAT"), std::string::npos);
 
-    // Dismiss the grant notification
+    // Dismiss the promotion notification
     if (use_panel) {
       content::EvalJsResult jsResult = EvalJs(contents,
       "new Promise((resolve) => {"
@@ -1141,31 +1265,16 @@ class BraveRewardsBrowserTest
       ASSERT_TRUE(js_result.ExtractBool());
   }
 
-  void TipPublisher(
-      const std::string& publisher,
-      bool should_contribute = false,
-      bool monthly = false,
-      int32_t selection = 0) {
-    // we shouldn't be adding publisher to AC list,
-    // so that we can focus only on tipping part
-    rewards_service_->SetPublisherMinVisitTime(8);
-
-    // Navigate to a site in a new tab
-    GURL url = https_server()->GetURL(publisher, "/index.html");
-    ui_test_utils::NavigateToURLWithDisposition(
-        browser(), url, WindowOpenDisposition::NEW_FOREGROUND_TAB,
-        ui_test_utils::BROWSER_TEST_WAIT_FOR_NAVIGATION);
-
-    // Open the Rewards popup
+  content::WebContents* OpenSiteBanner(ContributionType banner_type) const {
     content::WebContents* popup_contents = OpenRewardsPopup();
-    ASSERT_TRUE(popup_contents);
 
-    // Construct an observer to wait for the site banner to load
+    // Construct an observer to wait for the site banner to load.
     content::WindowedNotificationObserver site_banner_observer(
         content::NOTIFICATION_LOAD_COMPLETED_MAIN_FRAME,
         content::NotificationService::AllSources());
 
-    const std::string buttonSelector = monthly
+    const std::string buttonSelector =
+        banner_type == ContributionType::MonthlyTip
         ? "[type='tip-monthly']"
         : "[type='tip']";
 
@@ -1201,11 +1310,38 @@ class BraveRewardsBrowserTest
         static_cast<const content::Source<content::WebContents>&>(
             site_banner_observer.source());
 
-    content::WebContents* site_banner_contents = site_banner_source.ptr();
+    // Allow the site banner to update its UI. We cannot use ExecJs here,
+    // because it does not resolve promises.
+    (void)EvalJs(site_banner_source.ptr(),
+        "new Promise(resolve => setTimeout(resolve, 0))",
+        content::EXECUTE_SCRIPT_DEFAULT_OPTIONS,
+        content::ISOLATED_WORLD_ID_CONTENT_END);
+
+    return site_banner_source.ptr();
+  }
+
+  void TipPublisher(
+      const std::string& publisher,
+      ContributionType type,
+      bool should_contribute = false,
+      int32_t selection = 0) {
+    // we shouldn't be adding publisher to AC list,
+    // so that we can focus only on tipping part
+    rewards_service_->SetPublisherMinVisitTime(8);
+
+    // Navigate to a site in a new tab
+    GURL url = https_server()->GetURL(publisher, "/index.html");
+    ui_test_utils::NavigateToURLWithDisposition(
+        browser(), url, WindowOpenDisposition::NEW_FOREGROUND_TAB,
+        ui_test_utils::BROWSER_TEST_WAIT_FOR_NAVIGATION);
+
+    content::WebContents* site_banner_contents = OpenSiteBanner(type);
     ASSERT_TRUE(site_banner_contents);
 
-    const double amount = tip_amounts_.at(selection);
-    const std::string amount_str = std::to_string(static_cast<int32_t>(amount));
+    std::vector<double> tip_options =
+        GetSiteBannerTipOptions(site_banner_contents);
+    const double amount = tip_options.at(selection);
+    const std::string amount_str = base::StringPrintf("%2.1f", amount);
 
     // Select the tip amount (default is 1.0 BAT)
     ASSERT_TRUE(ExecJs(
@@ -1231,32 +1367,20 @@ class BraveRewardsBrowserTest
 
     // Signal that direct tip was made and update wallet with new
     // balance
-    if (!monthly && !should_contribute) {
+    if (type == ContributionType::OneTimeTip && !should_contribute) {
+      WaitForPendingTipToBeSaved();
       UpdateContributionBalance(amount, should_contribute);
     }
 
     // Wait for thank you banner to load
     ASSERT_TRUE(WaitForLoadStop(site_banner_contents));
 
-    // Make sure that thank you banner shows correct publisher data
-    // (domain and amount)
-    {
-      content::EvalJsResult js_result = EvalJs(
-          site_banner_contents,
-          "const delay = t => new Promise(resolve => setTimeout(resolve, t));"
-          "delay(0).then(() => "
-          "  document.documentElement.innerText);",
-          content::EXECUTE_SCRIPT_DEFAULT_OPTIONS,
-          content::ISOLATED_WORLD_ID_CONTENT_END);
-      EXPECT_NE(js_result.ExtractString().find("Tip sent!"), std::string::npos);
-      EXPECT_NE(js_result.ExtractString().find(
-          "Share the good news:"), std::string::npos);
-    }
+    const std::string confirmationText = type == ContributionType::MonthlyTip
+        ? "Monthly contribution has been set!"
+        : "Tip sent!";
 
-    // Activate the Rewards settings page tab
-    ActivateTabAtIndex(0);
-
-    if (monthly) {
+    if (type == ContributionType::MonthlyTip) {
+      WaitForRecurringTipToBeSaved();
       // Trigger contribution process
       rewards_service()->StartMonthlyContributionForTest();
 
@@ -1274,11 +1398,46 @@ class BraveRewardsBrowserTest
       if (!should_contribute) {
         UpdateContributionBalance(amount, should_contribute);
       }
-    } else if (!monthly && should_contribute) {
+    } else if (type == ContributionType::OneTimeTip && should_contribute) {
       // Wait for reconciliation to complete
       WaitForTipReconcileCompleted();
       ASSERT_EQ(tip_reconcile_status_, ledger::Result::LEDGER_OK);
     }
+
+    // Make sure that thank you banner shows correct publisher data
+    // (domain and amount)
+    {
+      content::EvalJsResult js_result = EvalJs(
+          site_banner_contents,
+          "const delay = t => new Promise(resolve => setTimeout(resolve, t));"
+          "delay(1000).then(() => "
+          "  document.documentElement.innerText);",
+          content::EXECUTE_SCRIPT_DEFAULT_OPTIONS,
+          content::ISOLATED_WORLD_ID_CONTENT_END);
+      EXPECT_NE(js_result.ExtractString().find(
+          confirmationText), std::string::npos);
+      EXPECT_NE(js_result.ExtractString().find(
+           "" + amount_str + " BAT"), std::string::npos);
+      EXPECT_NE(js_result.ExtractString().find(
+          "Share the good news:"), std::string::npos);
+      EXPECT_NE(js_result.ExtractString().find(
+           "" + GetBalance() + " BAT"), std::string::npos);
+    }
+
+    VerifyTip(amount, should_contribute, type == ContributionType::MonthlyTip);
+  }
+
+  void VerifyTip(
+      const double amount,
+      const bool should_contribute,
+      const bool monthly,
+      const bool via_code = false) {
+    if (via_code && monthly) {
+      return;
+    }
+
+    // Activate the Rewards settings page tab
+    ActivateTabAtIndex(0);
 
     if (should_contribute) {
       // Make sure that balance is updated correctly
@@ -1352,32 +1511,26 @@ class BraveRewardsBrowserTest
       wait_for_wallet_initialization_loop_->Quit();
   }
 
-  void OnGrant(brave_rewards::RewardsService* rewards_service,
-               unsigned int result,
-               brave_rewards::Grant properties) {
+  void OnFetchPromotions(
+      brave_rewards::RewardsService* rewards_service,
+      unsigned int result,
+      const std::vector<brave_rewards::Promotion>& promotions) {
     ASSERT_EQ(static_cast<ledger::Result>(result), ledger::Result::LEDGER_OK);
-    grant_initialized_ = true;
-    if (wait_for_grant_initialization_loop_)
-      wait_for_grant_initialization_loop_->Quit();
+    promotion_initialized_ = true;
+    if (wait_for_promotion_initialization_loop_)
+      wait_for_promotion_initialization_loop_->Quit();
   }
 
-  void OnGrantCaptcha(brave_rewards::RewardsService* rewards_service,
-                      std::string image,
-                      std::string hint) {
-    captcha_received_ = true;
-    if (wait_for_captcha_loop_)
-      wait_for_captcha_loop_->Quit();
-  }
-
-  void OnGrantFinish(brave_rewards::RewardsService* rewards_service,
-                     unsigned int result,
-                     brave_rewards::Grant grant) {
+  void OnPromotionFinished(
+      brave_rewards::RewardsService* rewards_service,
+      const uint32_t result,
+      brave_rewards::Promotion promotion) {
     ASSERT_EQ(static_cast<ledger::Result>(result), ledger::Result::LEDGER_OK);
-    grant_finished_ = true;
-    grant_ = grant;
-    balance_ += 30.0;
-    if (wait_for_grant_finished_loop_)
-      wait_for_grant_finished_loop_->Quit();
+    promotion_finished_ = true;
+    promotion_ = promotion;
+    if (wait_for_promotion_finished_loop_) {
+      wait_for_promotion_finished_loop_->Quit();
+    }
   }
 
   void OnPublisherListNormalized(brave_rewards::RewardsService* rewards_service,
@@ -1389,19 +1542,13 @@ class BraveRewardsBrowserTest
       wait_for_publisher_list_normalized_loop_->Quit();
   }
 
-  void OnReconcileComplete(brave_rewards::RewardsService* rewards_service,
-                           unsigned int result,
-                           const std::string& viewing_id,
-                           const std::string& probi,
-                           const int32_t type) {
-    const size_t size = probi.size();
-    std::string amount = "0";
-    if (size > 18) {
-      amount = probi.substr(0, size - 18);
-    }
-
-    double amount_double = std::stod(amount);
-    UpdateContributionBalance(amount_double, true);
+  void OnReconcileComplete(
+      brave_rewards::RewardsService* rewards_service,
+      unsigned int result,
+      const std::string& viewing_id,
+      const double amount,
+      const int32_t type) {
+    UpdateContributionBalance(amount, true);
 
     const auto converted_result = static_cast<ledger::Result>(result);
     const auto converted_type =
@@ -1417,7 +1564,7 @@ class BraveRewardsBrowserTest
 
     if (converted_type == ledger::RewardsType::ONE_TIME_TIP ||
         converted_type == ledger::RewardsType::RECURRING_TIP) {
-      reconciled_tip_total_ += amount_double;
+      reconciled_tip_total_ += amount;
 
       // Single tip tracking
       tip_reconcile_completed_ = true;
@@ -1439,8 +1586,30 @@ class BraveRewardsBrowserTest
     }
   }
 
-  void ACLowAmount() {
-    ac_low_amount_ = true;
+  void OnRecurringTipSaved(
+      brave_rewards::RewardsService* rewards_service,
+      bool success) {
+    if (!success) {
+      return;
+    }
+
+    recurring_tip_saved_ = true;
+    if (wait_for_recurring_tip_saved_loop_) {
+      wait_for_recurring_tip_saved_loop_->Quit();
+    }
+  }
+
+  void OnPendingContributionSaved(
+      brave_rewards::RewardsService* rewards_service,
+      int result) {
+    if (result != 0) {
+      return;
+    }
+
+    pending_tip_saved_ = true;
+    if (wait_for_pending_tip_saved_loop_) {
+      wait_for_pending_tip_saved_loop_->Quit();
+    }
   }
 
   void OnNotificationAdded(
@@ -1504,9 +1673,10 @@ class BraveRewardsBrowserTest
 
   void TipViaCode(
       const std::string publisher_key,
-      int amount,
-      bool recurring,
-      ledger::PublisherStatus status) {
+      const double amount,
+      const ledger::PublisherStatus status,
+      const bool should_contribute = false,
+      const bool recurring = false) {
     auto site = std::make_unique<brave_rewards::ContentSite>();
     site->id = publisher_key;
     site->name = publisher_key;
@@ -1515,9 +1685,22 @@ class BraveRewardsBrowserTest
     site->provider = "";
     site->favicon_url = "";
     rewards_service_->OnTip(publisher_key, amount, recurring, std::move(site));
-  }
 
-  const std::vector<double> tip_amounts_ = {1.0, 5.0, 10.0};
+    if (recurring) {
+      return;
+    }
+
+    if (should_contribute) {
+      // Wait for reconciliation to complete
+      WaitForTipReconcileCompleted();
+      ASSERT_EQ(tip_reconcile_status_, ledger::Result::LEDGER_OK);
+      return;
+    }
+
+    // Signal to update pending contribution balance
+    WaitForPendingTipToBeSaved();
+    UpdateContributionBalance(amount, should_contribute);
+  }
 
   MOCK_METHOD1(OnGetEnvironment, void(ledger::Environment));
   MOCK_METHOD1(OnGetDebug, void(bool));
@@ -1531,21 +1714,20 @@ class BraveRewardsBrowserTest
   brave_ads::AdsServiceImpl* ads_service_;
 
   std::unique_ptr<brave_ads::LocaleHelperMock> locale_helper_mock_;
+  const std::string newly_supported_locale_ = "cs_CZ";
+
   std::unique_ptr<brave_ads::NotificationHelperMock> notification_helper_mock_;
 
-  brave_rewards::Grant grant_;
+  brave_rewards::Promotion promotion_;
 
   std::unique_ptr<base::RunLoop> wait_for_wallet_initialization_loop_;
   bool wallet_initialized_ = false;
 
-  std::unique_ptr<base::RunLoop> wait_for_grant_initialization_loop_;
-  bool grant_initialized_ = false;
+  std::unique_ptr<base::RunLoop> wait_for_promotion_initialization_loop_;
+  bool promotion_initialized_ = false;
 
-  std::unique_ptr<base::RunLoop> wait_for_grant_finished_loop_;
-  bool grant_finished_ = false;
-
-  std::unique_ptr<base::RunLoop> wait_for_captcha_loop_;
-  bool captcha_received_ = false;
+  std::unique_ptr<base::RunLoop> wait_for_promotion_finished_loop_;
+  bool promotion_finished_ = false;
 
   std::unique_ptr<base::RunLoop> wait_for_publisher_list_normalized_loop_;
   bool publisher_list_normalized_ = false;
@@ -1568,9 +1750,18 @@ class BraveRewardsBrowserTest
   std::unique_ptr<base::RunLoop> brave_ads_have_arrived_notification_run_loop_;
   bool brave_ads_have_arrived_notification_was_already_shown_ = false;
 
-  bool ac_low_amount_ = false;
+  std::unique_ptr<base::RunLoop> wait_for_recurring_tip_saved_loop_;
+  bool recurring_tip_saved_ = false;
+
+  std::unique_ptr<base::RunLoop> wait_for_pending_tip_saved_loop_;
+  bool pending_tip_saved_ = false;
+
+  std::unique_ptr<base::RunLoop> wait_for_attestation_loop_;
+
   bool last_publisher_added_ = false;
   bool alter_publisher_list_ = false;
+  bool show_defaults_in_properties_ = false;
+  bool request_made_ = false;
   double balance_ = 0;
   double reconciled_tip_total_ = 0;
   double pending_balance_ = 0;
@@ -1917,33 +2108,33 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, HandleFlagsWrongInput) {
   RunUntilIdle();
 }
 
-// #1 - Claim grant via settings page
-IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, ClaimGrantViaSettingsPage) {
+// #1 - Claim promotion via settings page
+IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, ClaimPromotionViaSettingsPage) {
   // Observe the Rewards service
   rewards_service_->AddObserver(this);
 
   // Enable Rewards
   EnableRewards();
 
-  // Claim and verify grant using settings page
+  // Claim and verify promotion using settings page
   const bool use_panel = false;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Stop observing the Rewards service
   rewards_service_->RemoveObserver(this);
 }
 
-// #2 - Claim grant via panel
-IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, ClaimGrantViaPanel) {
+// #2 - Claim promotion via panel
+IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, ClaimPromotionViaPanel) {
   // Observe the Rewards service
   rewards_service_->AddObserver(this);
 
   // Enable Rewards
   EnableRewards();
 
-  // Claim and verify grant using panel
+  // Claim and verify promotion using panel
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Stop observing the Rewards service
   rewards_service_->RemoveObserver(this);
@@ -1956,7 +2147,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
   rewards_service_->AddObserver(this);
 
   // Enable Rewards
-  EnableRewards();
+  EnableRewardsViaCode();
 
   // Navigate to a verified site in a new tab
   const std::string publisher = "duckduckgo.com";
@@ -2055,9 +2246,9 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, AutoContribution) {
   // Enable Rewards
   EnableRewards();
 
-  // Claim grant using panel
+  // Claim promotion using panel
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Visit verified publisher
   const bool verified = true;
@@ -2087,9 +2278,9 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, AutoContributeWhenACOff) {
 
   EnableRewards();
 
-  // Claim grant using panel
+  // Claim promotion using panel
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Visit verified publisher
   const bool verified = true;
@@ -2140,12 +2331,12 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, TipVerifiedPublisher) {
   // Enable Rewards
   EnableRewards();
 
-  // Claim grant using settings page
+  // Claim promotion using settings page
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Tip verified publisher
-  TipPublisher("duckduckgo.com", true);
+  TipPublisher("duckduckgo.com", ContributionType::OneTimeTip, true);
 
   // Stop observing the Rewards service
   rewards_service_->RemoveObserver(this);
@@ -2159,12 +2350,12 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, TipUnverifiedPublisher) {
   // Enable Rewards
   EnableRewards();
 
-  // Claim grant using settings page
+  // Claim promotion using settings page
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Tip unverified publisher
-  TipPublisher("brave.com");
+  TipPublisher("brave.com", ContributionType::OneTimeTip);
 
   // Stop observing the Rewards service
   rewards_service_->RemoveObserver(this);
@@ -2179,13 +2370,12 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
   // Enable Rewards
   EnableRewards();
 
-  // Claim grant using settings page
+  // Claim promotion using settings page
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Tip verified publisher
-  const bool monthly = true;
-  TipPublisher("duckduckgo.com", true, monthly);
+  TipPublisher("duckduckgo.com", ContributionType::MonthlyTip, true);
 
   // Stop observing the Rewards service
   rewards_service_->RemoveObserver(this);
@@ -2200,46 +2390,12 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
   // Enable Rewards
   EnableRewards();
 
-  // Claim grant using settings page
+  // Claim promotion using settings page
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Tip verified publisher
-  const bool monthly = true;
-  TipPublisher("brave.com", false, monthly);
-
-  // Stop observing the Rewards service
-  rewards_service_->RemoveObserver(this);
-}
-
-// Tip is below server threshold
-IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
-                       ContributionWithLowAmount) {
-  // Observe the Rewards service
-  rewards_service_->AddObserver(this);
-
-  // Enable Rewards
-  EnableRewards();
-
-  // Claim grant using panel
-  const bool use_panel = true;
-  ClaimGrant(use_panel);
-
-  // Set monthly to 0.2 BAT
-  rewards_service()->SetContributionAmount(0.2);
-
-  // Visit verified publisher
-  const bool verified = true;
-  VisitPublisher("duckduckgo.com", verified);
-
-  ACLowAmount();
-
-  // Trigger contribution process
-  rewards_service()->StartMonthlyContributionForTest();
-
-  // Wait for reconciliation to complete successfully
-  WaitForACReconcileCompleted();
-  ASSERT_EQ(ac_reconcile_status_, ledger::Result::CONTRIBUTION_AMOUNT_TOO_LOW);
+  TipPublisher("brave.com", ContributionType::MonthlyTip, false);
 
   // Stop observing the Rewards service
   rewards_service_->RemoveObserver(this);
@@ -2248,7 +2404,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 // Brave tip icon is injected when visiting Twitter
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, TwitterTipsInjectedOnTwitter) {
   // Enable Rewards
-  EnableRewards();
+  EnableRewardsViaCode();
 
   // Navigate to Twitter in a new tab
   GURL url = https_server()->GetURL("twitter.com", "/twitter");
@@ -2278,7 +2434,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
                        TwitterTipsInjectedOnOldTwitter) {
   // Enable Rewards
-  EnableRewards();
+  EnableRewardsViaCode();
 
   // Navigate to Twitter in a new tab
   GURL url = https_server()->GetURL("twitter.com", "/oldtwitter");
@@ -2308,7 +2464,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
                        TwitterTipsNotInjectedOnNonTwitter) {
   // Enable Rewards
-  EnableRewards();
+  EnableRewardsViaCode();
 
   // Navigate to a non-Twitter site in a new tab
   GURL url = https_server()->GetURL("brave.com", "/twitter");
@@ -2323,7 +2479,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 // Brave tip icon is injected when visiting Reddit
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, RedditTipsInjectedOnReddit) {
   // Enable Rewards
-  EnableRewards();
+  EnableRewardsViaCode();
 
   // Navigate to Reddit in a new tab
   GURL url = https_server()->GetURL("reddit.com", "/reddit");
@@ -2352,7 +2508,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
                        RedditTipsNotInjectedOnNonReddit) {
   // Enable Rewards
-  EnableRewards();
+  EnableRewardsViaCode();
 
   // Navigate to Reddit in a new tab
   GURL url = https_server()->GetURL("brave.com", "/reddit");
@@ -2367,7 +2523,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 // Brave tip icon is injected when visiting GitHub
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, GitHubTipsInjectedOnGitHub) {
   // Enable Rewards
-  EnableRewards();
+  EnableRewardsViaCode();
 
   // Navigate to GitHub in a new tab
   GURL url = https_server()->GetURL("github.com", "/github");
@@ -2397,7 +2553,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
                        GitHubTipsNotInjectedOnNonGitHub) {
   // Enable Rewards
-  EnableRewards();
+  EnableRewardsViaCode();
 
   // Navigate to GitHub in a new tab
   GURL url = https_server()->GetURL("brave.com", "/github");
@@ -2420,12 +2576,12 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
   // Enable Rewards
   EnableRewards();
 
-  // Claim grant using settings page
+  // Claim promotion using settings page
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Tip unverified publisher
-  TipPublisher(publisher);
+  TipPublisher(publisher, ContributionType::OneTimeTip);
 
   // Check that link for pending is shown
   {
@@ -2475,7 +2631,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
     InsufficientNotificationForZeroAmountZeroPublishers) {
   rewards_service_->GetNotificationService()->AddObserver(this);
-  EnableRewards();
+  EnableRewardsViaCode();
   CheckInsufficientFundsForTesting();
   WaitForInsufficientFundsNotification();
   const brave_rewards::RewardsNotificationService::RewardsNotificationsMap&
@@ -2533,16 +2689,23 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
   rewards_service_->AddObserver(this);
   rewards_service_->GetNotificationService()->AddObserver(this);
   EnableRewards();
-  // Claim grant using panel
+  // Claim promotion using panel
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
-  const bool verified = true;
-  VisitPublisher("duckduckgo.com", verified);
-  rewards_service_->OnTip("duckduckgo.com", 20, true);
+  TipViaCode(
+      "duckduckgo.com",
+      20.0,
+      ledger::PublisherStatus::VERIFIED,
+      false,
+      true);
 
-  VisitPublisher("brave.com", !verified);
-  rewards_service_->OnTip("brave.com", 50, true);
+  TipViaCode(
+      "brave.com",
+      50.0,
+      ledger::PublisherStatus::NOT_VERIFIED,
+      false,
+      true);
 
   CheckInsufficientFundsForTesting();
   WaitForInsufficientFundsNotification();
@@ -2568,16 +2731,23 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
   rewards_service_->AddObserver(this);
   rewards_service_->GetNotificationService()->AddObserver(this);
   EnableRewards();
-  // Claim grant using panel
+  // Claim promotion using panel
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
-  const bool verified = true;
-  VisitPublisher("duckduckgo.com", verified);
-  rewards_service_->OnTip("duckduckgo.com", 50, true);
+  TipViaCode(
+      "duckduckgo.com",
+      50.0,
+      ledger::PublisherStatus::VERIFIED,
+      false,
+      true);
 
-  VisitPublisher("brave.com", !verified);
-  rewards_service_->OnTip("brave.com", 50, true);
+  TipViaCode(
+      "brave.com",
+      50.0,
+      ledger::PublisherStatus::NOT_VERIFIED,
+      false,
+      true);
 
   CheckInsufficientFundsForTesting();
   WaitForInsufficientFundsNotification();
@@ -2619,25 +2789,28 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 
   EnableRewards();
 
-  // Claim grant using panel
-  ClaimGrant(true);
+  contents()->GetController().Reload(content::ReloadType::NORMAL, true);
+  EXPECT_TRUE(WaitForLoadStop(contents()));
 
   // Tip unverified publisher
-  TipPublisher("brave.com");
-  rewards_service_->OnTip("brave.com", 5.0, false);
-  UpdateContributionBalance(5.0, false);  // update pending balance
-  TipPublisher("3zsistemi.si", false, false, 2);
-  TipPublisher("3zsistemi.si", false, false, 1);
-  TipPublisher("3zsistemi.si", false, false, 2);
-  TipPublisher("3zsistemi.si", false, false, 2);
+  TipViaCode("brave.com", 1.0, ledger::PublisherStatus::NOT_VERIFIED);
+  TipViaCode("brave.com", 5.0, ledger::PublisherStatus::NOT_VERIFIED);
+  TipViaCode("3zsistemi.si", 10.0, ledger::PublisherStatus::NOT_VERIFIED);
+  TipViaCode("3zsistemi.si", 5.0, ledger::PublisherStatus::NOT_VERIFIED);
+  TipViaCode("3zsistemi.si", 10.0, ledger::PublisherStatus::NOT_VERIFIED);
+  TipViaCode("3zsistemi.si", 10.0, ledger::PublisherStatus::NOT_VERIFIED);
 
-  // Make sure that pending contribution box shows the correct
-  // amount
-  ASSERT_EQ(RewardsPagePendingContributions(), ExpectedPendingBalanceString());
+  // Claim promotion using panel
+  ClaimPromotion(true);
 
   alter_publisher_list_ = false;
+  VerifyTip(41.0, false, false, true);
 
-  ActivateTabAtIndex(2);
+  // Visit publisher
+  GURL url = https_server()->GetURL("3zsistemi.si", "/index.html");
+  ui_test_utils::NavigateToURLWithDisposition(
+      browser(), url, WindowOpenDisposition::NEW_FOREGROUND_TAB,
+      ui_test_utils::BROWSER_TEST_WAIT_FOR_NAVIGATION);
 
   // Refresh publisher list
   RefreshPublisherListUsingRewardsPopup();
@@ -2696,6 +2869,76 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
   }
 
   // Stop observing the Rewards service
+  rewards_service_->RemoveObserver(this);
+}
+
+IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, RewardsPanelDefaultTipChoices) {
+  show_defaults_in_properties_ = true;
+  rewards_service_->AddObserver(this);
+  EnableRewards();
+
+  bool use_panel = true;
+  ClaimPromotion(use_panel);
+
+  GURL url = https_server()->GetURL("3zsistemi.si", "/index.html");
+  ui_test_utils::NavigateToURLWithDisposition(
+      browser(), url, WindowOpenDisposition::NEW_FOREGROUND_TAB,
+      ui_test_utils::BROWSER_TEST_WAIT_FOR_NAVIGATION);
+
+  // Add a recurring tip of 10 BAT.
+  TipViaCode(
+      "3zsistemi.si",
+      10.0,
+      ledger::PublisherStatus::VERIFIED,
+      false,
+      true);
+
+  content::WebContents* popup = OpenRewardsPopup();
+  const auto tip_options = GetRewardsPopupTipOptions(popup);
+  ASSERT_EQ(tip_options, std::vector<double>({ 0, 10, 20, 50 }));
+
+  rewards_service_->RemoveObserver(this);
+}
+
+IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, SiteBannerDefaultTipChoices) {
+  show_defaults_in_properties_ = true;
+  rewards_service_->AddObserver(this);
+  EnableRewards();
+
+  GURL url = https_server()->GetURL("3zsistemi.si", "/index.html");
+  ui_test_utils::NavigateToURLWithDisposition(
+      browser(), url, WindowOpenDisposition::NEW_FOREGROUND_TAB,
+      ui_test_utils::BROWSER_TEST_WAIT_FOR_NAVIGATION);
+
+  content::WebContents* site_banner =
+      OpenSiteBanner(ContributionType::OneTimeTip);
+  auto tip_options = GetSiteBannerTipOptions(site_banner);
+  ASSERT_EQ(tip_options, std::vector<double>({ 5, 10, 20 }));
+
+  site_banner = OpenSiteBanner(ContributionType::MonthlyTip);
+  tip_options = GetSiteBannerTipOptions(site_banner);
+  ASSERT_EQ(tip_options, std::vector<double>({ 10, 20, 50 }));
+
+  rewards_service_->RemoveObserver(this);
+}
+
+IN_PROC_BROWSER_TEST_F(
+    BraveRewardsBrowserTest,
+    SiteBannerDefaultPublisherAmounts) {
+  show_defaults_in_properties_ = true;
+  rewards_service_->AddObserver(this);
+  EnableRewards();
+
+  GURL url = https_server()->GetURL("laurenwags.github.io", "/index.html");
+  ui_test_utils::NavigateToURLWithDisposition(
+      browser(), url, WindowOpenDisposition::NEW_FOREGROUND_TAB,
+      ui_test_utils::BROWSER_TEST_WAIT_FOR_NAVIGATION);
+
+  content::WebContents* site_banner =
+      OpenSiteBanner(ContributionType::OneTimeTip);
+  const auto tip_options = GetSiteBannerTipOptions(site_banner);
+  ASSERT_EQ(tip_options, std::vector<double>({ 5, 10, 20 }));
+
   rewards_service_->RemoveObserver(this);
 }
 
@@ -2761,8 +3004,66 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
   // Enable Rewards
   EnableRewards();
 
-  // Tip verified publisher
-  TipPublisher("duckduckgo.com", true);
+  const double amount = 5.0;
+  const bool should_contribute = true;
+  TipViaCode(
+      "duckduckgo.com",
+      amount,
+      ledger::PublisherStatus::VERIFIED,
+      should_contribute);
+  VerifyTip(amount, should_contribute, false, true);
+
+  // Stop observing the Rewards service
+  rewards_service()->RemoveObserver(this);
+}
+
+IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
+                       MultipleTipsProduceMultipleFeesWithVerifiedWallet) {
+  rewards_service()->AddObserver(this);
+  verified_wallet_ = true;
+  external_balance_ = 50.0;
+
+  auto wallet = ledger::ExternalWallet::New();
+  wallet->token = "token";
+  wallet->address = external_wallet_address_;
+  wallet->status = ledger::WalletStatus::VERIFIED;
+  wallet->one_time_string = "";
+  wallet->user_name = "Brave Test";
+  wallet->transferred = true;
+  rewards_service()->SaveExternalWallet("uphold", std::move(wallet));
+
+  // Enable Rewards
+  EnableRewards();
+
+  double total_amount = 0.0;
+  const double amount = 5.0;
+  const double fee_percentage = 0.05;
+  const double tip_fee = amount * fee_percentage;
+  const bool should_contribute = true;
+  TipViaCode(
+      "duckduckgo.com",
+      amount,
+      ledger::PublisherStatus::VERIFIED,
+      should_contribute);
+  total_amount += amount;
+
+  TipViaCode(
+      "laurenwags.github.io",
+      amount,
+      ledger::PublisherStatus::VERIFIED,
+      should_contribute);
+  total_amount += amount;
+
+  VerifyTip(total_amount, should_contribute, false, true);
+
+  ledger::TransferFeeList transfer_fees =
+      rewards_service()->GetTransferFeesForTesting("uphold");
+
+  ASSERT_EQ(transfer_fees.size(), 2UL);
+
+  for (auto const& value : transfer_fees) {
+    ASSERT_EQ(value.second->amount, tip_fee);
+  }
 
   // Stop observing the Rewards service
   rewards_service()->RemoveObserver(this);
@@ -2775,12 +3076,19 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, TipConnectedPublisherAnon) {
   // Enable Rewards
   EnableRewards();
 
-  // Claim grant using settings page
+  // Claim promotion using settings page
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Tip verified publisher
-  TipPublisher("bumpsmack.com", true);
+  const double amount = 5.0;
+  const bool should_contribute = true;
+  TipViaCode(
+      "bumpsmack.com",
+      amount,
+      ledger::PublisherStatus::CONNECTED,
+      should_contribute);
+  VerifyTip(amount, should_contribute, false, true);
 
   // Stop observing the Rewards service
   rewards_service_->RemoveObserver(this);
@@ -2806,12 +3114,19 @@ IN_PROC_BROWSER_TEST_F(
   // Enable Rewards
   EnableRewards();
 
-  // Claim grant using settings page
+  // Claim promotion using settings page
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Tip verified publisher
-  TipPublisher("bumpsmack.com", true);
+  const double amount = 5.0;
+  const bool should_contribute = true;
+  TipViaCode(
+      "bumpsmack.com",
+      amount,
+      ledger::PublisherStatus::CONNECTED,
+      should_contribute);
+  VerifyTip(amount, should_contribute, false, true);
 
   // Stop observing the Rewards service
   rewards_service_->RemoveObserver(this);
@@ -2836,9 +3151,18 @@ IN_PROC_BROWSER_TEST_F(
 
   // Enable Rewards
   EnableRewards();
+  contents()->GetController().Reload(content::ReloadType::NORMAL, true);
+  EXPECT_TRUE(WaitForLoadStop(contents()));
 
-  // Tip verified publisher
-  TipPublisher("bumpsmack.com", false);
+  // Tip connected publisher
+  const double amount = 5.0;
+  const bool should_contribute = false;
+  TipViaCode(
+      "bumpsmack.com",
+      amount,
+      ledger::PublisherStatus::CONNECTED,
+      should_contribute);
+  VerifyTip(amount, should_contribute, false, true);
 
   // Stop observing the Rewards service
   rewards_service_->RemoveObserver(this);
@@ -2863,11 +3187,61 @@ IN_PROC_BROWSER_TEST_F(
 
   // Enable Rewards
   EnableRewards();
+  contents()->GetController().Reload(content::ReloadType::NORMAL, true);
+  EXPECT_TRUE(WaitForLoadStop(contents()));
 
   // Tip verified publisher
-  TipPublisher("bumpsmack.com", false);
+  const double amount = 5.0;
+  const bool should_contribute = false;
+  TipViaCode(
+      "bumpsmack.com",
+      amount,
+      ledger::PublisherStatus::CONNECTED,
+      should_contribute);
+  VerifyTip(amount, should_contribute, false, true);
 
   // Stop observing the Rewards service
+  rewards_service_->RemoveObserver(this);
+}
+
+// Ensure that we can make a one-time tip of a non-integral amount.
+IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, TipNonIntegralAmount) {
+  rewards_service()->AddObserver(this);
+
+  EnableRewards();
+
+  const bool use_panel = true;
+  ClaimPromotion(use_panel);
+
+  // TODO(jhoneycutt): Test that this works through the tipping UI.
+  rewards_service()->OnTip("duckduckgo.com", 2.5, false);
+  WaitForTipReconcileCompleted();
+  ASSERT_EQ(tip_reconcile_status_, ledger::Result::LEDGER_OK);
+
+  ASSERT_EQ(reconciled_tip_total_, 2.5);
+
+  rewards_service_->RemoveObserver(this);
+}
+
+// Ensure that we can make a recurring tip of a non-integral amount.
+IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, RecurringTipNonIntegralAmount) {
+  rewards_service()->AddObserver(this);
+
+  EnableRewards();
+
+  const bool use_panel = true;
+  ClaimPromotion(use_panel);
+
+  const bool verified = true;
+  VisitPublisher("duckduckgo.com", verified);
+
+  rewards_service()->OnTip("duckduckgo.com", 2.5, true);
+  rewards_service()->StartMonthlyContributionForTest();
+  WaitForTipReconcileCompleted();
+  ASSERT_EQ(tip_reconcile_status_, ledger::Result::LEDGER_OK);
+
+  ASSERT_EQ(reconciled_tip_total_, 2.5);
+
   rewards_service_->RemoveObserver(this);
 }
 
@@ -2879,17 +3253,23 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
   // Enable Rewards
   EnableRewards();
 
-  // Claim grant using panel (30 BAT)
+  // Claim promotion using panel (30 BAT)
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Visit verified publisher
   const bool verified = true;
   VisitPublisher("duckduckgo.com", verified);
-  VisitPublisher("brave.com", !verified);
 
   // Set monthly recurring
-  rewards_service_->OnTip("duckduckgo.com", 25, true);
+  TipViaCode(
+      "duckduckgo.com",
+      25.0,
+      ledger::PublisherStatus::VERIFIED,
+      false,
+      true);
+
+  VisitPublisher("brave.com", !verified);
 
   // Trigger contribution process
   rewards_service()->StartMonthlyContributionForTest();
@@ -2926,20 +3306,41 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
   // Enable Rewards
   EnableRewards();
 
-  // Claim grant using panel (30 BAT)
+  TipViaCode(
+      "duckduckgo.com",
+      5.0,
+      ledger::PublisherStatus::VERIFIED,
+      false,
+      true);
+
+  TipViaCode(
+      "site1.com",
+      10.0,
+      ledger::PublisherStatus::VERIFIED,
+      false,
+      true);
+
+  TipViaCode(
+      "site2.com",
+      10.0,
+      ledger::PublisherStatus::VERIFIED,
+      false,
+      true);
+
+  TipViaCode(
+      "site3.com",
+      10.0,
+      ledger::PublisherStatus::VERIFIED,
+      false,
+      true);
+
+  // Claim promotion using panel (30 BAT)
   const bool use_panel = true;
-  ClaimGrant(use_panel);
+  ClaimPromotion(use_panel);
 
   // Visit verified publisher
   const bool verified = true;
   VisitPublisher("duckduckgo.com", verified);
-
-  // Set monthly recurring
-  rewards_service_->OnTip("duckduckgo.com", 5, true);
-
-  TipViaCode("site1.com", 10, true, ledger::PublisherStatus::VERIFIED);
-  TipViaCode("site2.com", 10, true, ledger::PublisherStatus::VERIFIED);
-  TipViaCode("site3.com", 10, true, ledger::PublisherStatus::VERIFIED);
 
   // Trigger contribution process
   rewards_service()->StartMonthlyContributionForTest();
@@ -2991,10 +3392,9 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
     BraveAdsLocaleIsNewlySupportedForLatestSchemaVersion) {
-  // "BraveAdsLocaleIsNewlySupportedForLatestSchemaVersion" key in "const
-  // std::map<std::string, std::string> locale_for_tests" will need the value
-  // updating with a locale from the latest supported regions schema version
-  // defined in "vendor/bat-native-ads/src/bat/ads/internal/static_values.h"
+  // IMPORTANT: When adding new schema versions |newly_supported_locale_| must
+  // be updated in |BraveRewardsBrowserTest| to reflect a locale from the latest
+  // schema version in "bat-native-ads/src/bat/ads/internal/static_values.h"
 
   GetPrefs()->SetInteger(brave_ads::prefs::kSupportedRegionsLastSchemaVersion,
       brave_ads::prefs::kSupportedRegionsSchemaVersionNumber);
@@ -3018,7 +3418,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
     PRE_AutoEnableAdsForSupportedLocales) {
-  EnableRewards();
+  EnableRewardsViaCode();
 
   EXPECT_TRUE(IsAdsEnabled());
 }
@@ -3030,7 +3430,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
     PRE_DoNotAutoEnableAdsForUnsupportedLocales) {
-  EnableRewards();
+  EnableRewardsViaCode();
 
   EXPECT_FALSE(IsAdsEnabled());
 }
@@ -3042,7 +3442,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
     PRE_ShowBraveAdsHaveArrivedNotificationForNewLocale) {
-  EnableRewards();
+  EnableRewardsViaCode();
 
   EXPECT_FALSE(IsAdsEnabled());
 }
@@ -3058,7 +3458,7 @@ IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest,
     PRE_DoNotShowBraveAdsHaveArrivedNotificationForUnsupportedLocale) {
-  EnableRewards();
+  EnableRewardsViaCode();
 
   EXPECT_FALSE(IsAdsEnabled());
 }
@@ -3077,6 +3477,37 @@ IN_PROC_BROWSER_TEST_F(
   EnableRewards(true);
 }
 
+IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, PanelDontDoRequests) {
+  // Observe the Rewards service
+  rewards_service_->AddObserver(this);
+
+  // Open the Rewards popup
+  content::WebContents *popup_contents = OpenRewardsPopup();
+  ASSERT_TRUE(popup_contents);
+
+  // Make sure that no request was made
+  ASSERT_FALSE(request_made_);
+
+  // Stop observing the Rewards service
+  rewards_service_->RemoveObserver(this);
+}
+
+IN_PROC_BROWSER_TEST_F(BraveRewardsBrowserTest, ShowMonthlyIfACOff) {
+  EnableRewardsViaCode();
+  rewards_service_->SetAutoContribute(false);
+
+  GURL url = https_server()->GetURL("3zsistemi.si", "/");
+  ui_test_utils::NavigateToURLWithDisposition(
+      browser(), url, WindowOpenDisposition::NEW_FOREGROUND_TAB,
+      ui_test_utils::BROWSER_TEST_WAIT_FOR_NAVIGATION);
+
+  // Open the Rewards popup
+  content::WebContents *popup_contents = OpenRewardsPopup();
+  ASSERT_TRUE(popup_contents);
+
+  WaitForSelector(popup_contents, "#panel-donate-monthly");
+}
+
 struct BraveAdsUpgradePathParamInfo {
   // |preferences| should be set to the name of the preferences filename located
   // at "src/brave/test/data/rewards-data/migration"
@@ -3085,6 +3516,10 @@ struct BraveAdsUpgradePathParamInfo {
   // |supported_locale| should be set to |true| if the locale should be set to a
   // supported locale; otherwise, should be set to |false|
   bool supported_locale;
+
+  // |newly_supported_locale| should be set to |true| if the locale should be
+  // set to a newly supported locale; otherwise, should be set to |false|
+  bool newly_supported_locale;
 
   // |rewards_enabled| should be set to |true| if Brave rewards should be
   // enabled after upgrade; otherwise, should be set to |false|
@@ -3111,13 +3546,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion062WithRewardsDisabled",
     false, /* supported_locale */
-    false, /* rewards_enabled */
-    false, /* ads_enabled */
-    false  /* should_show_onboarding */
-  },
-  {
-    "PreferencesForVersion062WithRewardsDisabled",
-    true,  /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3125,13 +3554,39 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion062WithRewardsEnabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion062WithRewardsDisabled",
+    true,  /* supported_locale */
+    false, /* newly_supported_locale */
+    false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
   },
   {
     "PreferencesForVersion062WithRewardsEnabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion062WithRewardsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    false, /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion062WithRewardsEnabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     true   /* should_show_onboarding */
@@ -3141,6 +3596,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion063WithRewardsAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3148,6 +3604,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion063WithRewardsEnabledAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3155,6 +3612,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion063WithRewardsAndAdsEnabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3162,6 +3620,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion063WithRewardsAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3169,6 +3628,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion063WithRewardsEnabledAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     true   /* should_show_onboarding */
@@ -3178,15 +3638,41 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   // {
   //   "PreferencesForVersion063WithRewardsAndAdsEnabled",
   //   true,  /* supported_locale */
+  //   false, /* newly_supported_locale */
   //   true,  /* rewards_enabled */
   //   true,  /* ads_enabled */
   //   false  /* should_show_onboarding */
   // },
+  {
+    "PreferencesForVersion063WithRewardsAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    false, /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion063WithRewardsEnabledAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion063WithRewardsAndAdsEnabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
+  },
 
   // Upgrade from 0.67 to current version
   {
     "PreferencesForVersion067WithRewardsAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3194,6 +3680,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion067WithRewardsEnabledAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3201,6 +3688,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion067WithRewardsAndAdsEnabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3208,6 +3696,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion067WithRewardsAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3215,6 +3704,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion067WithRewardsEnabledAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     true   /* should_show_onboarding */
@@ -3222,15 +3712,41 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion067WithRewardsAndAdsEnabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     true,  /* ads_enabled */
     false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion067WithRewardsAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    false, /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion067WithRewardsEnabledAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion067WithRewardsAndAdsEnabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
   },
 
   // Upgrade from 0.68 to current version
   {
     "PreferencesForVersion068WithRewardsAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3238,6 +3754,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion068WithRewardsEnabledAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3245,6 +3762,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion068WithRewardsAndAdsEnabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3252,6 +3770,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion068WithRewardsAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3259,6 +3778,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion068WithRewardsEnabledAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     true   /* should_show_onboarding */
@@ -3266,15 +3786,41 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion068WithRewardsAndAdsEnabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     true,  /* ads_enabled */
     false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion068WithRewardsAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    false, /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion068WithRewardsEnabledAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion068WithRewardsAndAdsEnabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
   },
 
   // Upgrade from 0.69 to current version
   {
     "PreferencesForVersion069WithRewardsAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3282,6 +3828,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion069WithRewardsEnabledAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3289,6 +3836,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion069WithRewardsAndAdsEnabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3296,6 +3844,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion069WithRewardsAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3303,6 +3852,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion069WithRewardsEnabledAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     true   /* should_show_onboarding */
@@ -3310,15 +3860,41 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion069WithRewardsAndAdsEnabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     true,  /* ads_enabled */
     false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion069WithRewardsAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    false, /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion069WithRewardsEnabledAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion069WithRewardsAndAdsEnabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
   },
 
   // Upgrade from 0.70 to current version
   {
     "PreferencesForVersion070WithRewardsAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3326,6 +3902,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion070WithRewardsEnabledAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3333,6 +3910,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion070WithRewardsAndAdsEnabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3340,6 +3918,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion070WithRewardsAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3347,6 +3926,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion070WithRewardsEnabledAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     true   /* should_show_onboarding */
@@ -3354,15 +3934,41 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion070WithRewardsAndAdsEnabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     true,  /* ads_enabled */
     false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion070WithRewardsAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    false, /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion070WithRewardsEnabledAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion070WithRewardsAndAdsEnabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
   },
 
   // Upgrade from 0.71 to current version
   {
     "PreferencesForVersion071WithRewardsAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3370,6 +3976,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion071WithRewardsEnabledAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3377,6 +3984,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion071WithRewardsAndAdsEnabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3384,6 +3992,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion071WithRewardsAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3391,6 +4000,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion071WithRewardsEnabledAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     true   /* should_show_onboarding */
@@ -3398,15 +4008,41 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion071WithRewardsAndAdsEnabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     true,  /* ads_enabled */
     false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion071WithRewardsAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    false, /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion071WithRewardsEnabledAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion071WithRewardsAndAdsEnabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
   },
 
   // Upgrade from 0.72 to current version
   {
     "PreferencesForVersion072WithRewardsAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3414,6 +4050,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion072WithRewardsEnabledAndAdsDisabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3421,13 +4058,15 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion072WithRewardsAndAdsEnabled",
     false, /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
-    true, /* ads_enabled */
+    false, /* ads_enabled */
     false  /* should_show_onboarding */
   },
   {
     "PreferencesForVersion072WithRewardsAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     false, /* rewards_enabled */
     false, /* ads_enabled */
     false  /* should_show_onboarding */
@@ -3435,6 +4074,7 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion072WithRewardsEnabledAndAdsDisabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     false, /* ads_enabled */
     true   /* should_show_onboarding */
@@ -3442,20 +4082,124 @@ const BraveAdsUpgradePathParamInfo kTests[] = {
   {
     "PreferencesForVersion072WithRewardsAndAdsEnabled",
     true,  /* supported_locale */
+    false, /* newly_supported_locale */
     true,  /* rewards_enabled */
     true,  /* ads_enabled */
     false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion072WithRewardsAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    false, /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion072WithRewardsEnabledAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion072WithRewardsAndAdsEnabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
+  },
+
+  // Upgrade from 1.2 to current version
+  {
+    "PreferencesForVersion12WithRewardsAndAdsDisabled",
+    false, /* supported_locale */
+    false, /* newly_supported_locale */
+    false, /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion12WithRewardsEnabledAndAdsDisabled",
+    false, /* supported_locale */
+    false, /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion12WithRewardsAndAdsEnabled",
+    false, /* supported_locale */
+    false, /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion12WithRewardsAndAdsDisabled",
+    true,  /* supported_locale */
+    false, /* newly_supported_locale */
+    false, /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion12WithRewardsEnabledAndAdsDisabled",
+    true,  /* supported_locale */
+    false, /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion12WithRewardsAndAdsEnabled",
+    true,  /* supported_locale */
+    false, /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    true,  /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion12WithRewardsAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    false, /* rewards_enabled */
+    false, /* ads_enabled */
+    false  /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion12WithRewardsEnabledAndAdsDisabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
+  },
+  {
+    "PreferencesForVersion12WithRewardsAndAdsEnabled",
+    true,  /* supported_locale */
+    true,  /* newly_supported_locale */
+    true,  /* rewards_enabled */
+    false, /* ads_enabled */
+    true   /* should_show_onboarding */
   }
 };
+
+IN_PROC_BROWSER_TEST_P(BraveAdsBrowserTest, PRE_UpgradePath) {
+  // Handled in |MaybeMockLocaleHelperForBraveAdsUpgradePath|
+}
 
 IN_PROC_BROWSER_TEST_P(BraveAdsBrowserTest, UpgradePath) {
   BraveAdsUpgradePathParamInfo param(GetParam());
 
+  EXPECT_EQ(IsRewardsEnabled(), param.rewards_enabled);
+
+  EXPECT_EQ(IsAdsEnabled(), param.ads_enabled);
+
   bool is_showing_notification = IsShowingNotificationForType(
       RewardsNotificationType::REWARDS_NOTIFICATION_ADS_ONBOARDING);
-
-  EXPECT_EQ(IsRewardsEnabled(), param.rewards_enabled);
-  EXPECT_EQ(IsAdsEnabled(), param.ads_enabled);
   EXPECT_EQ(is_showing_notification, param.should_show_onboarding);
 }
 
@@ -3468,6 +4212,9 @@ static std::string GetTestCaseName(
   const char* supported_locale = param_info.param.supported_locale ?
       "ForSupportedLocale" : "ForUnsupportedLocale";
 
+  const char* newly_supported_locale = param_info.param.newly_supported_locale ?
+      "ForNewlySupportedLocale" : "ForUnsupportedLocale";
+
   const char* rewards_enabled = param_info.param.rewards_enabled ?
       "RewardsShouldBeEnabled" : "RewardsShouldBeDisabled";
 
@@ -3479,8 +4226,9 @@ static std::string GetTestCaseName(
 
   // NOTE: You should not remove, change the format or reorder the following
   // parameters as they are parsed in |GetUpgradePathParams|
-  return base::StringPrintf("%s_%s_%s_%s_%s", preferences, supported_locale,
-      rewards_enabled, ads_enabled, should_show_onboarding);
+  return base::StringPrintf("%s_%s_%s_%s_%s_%s", preferences, supported_locale,
+      newly_supported_locale, rewards_enabled, ads_enabled,
+          should_show_onboarding);
 }
 
 INSTANTIATE_TEST_SUITE_P(BraveRewardsBrowserTest,

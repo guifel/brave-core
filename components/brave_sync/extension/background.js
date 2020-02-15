@@ -1,16 +1,23 @@
 'use strict';
 
-chrome.braveSync.onGotInitData.addListener(function(seed, device_id, config, sync_words) {
+chrome.braveSync.onGotInitData.addListener(function(seed, device_id, config, device_id_v2) {
   if ((seed instanceof Array && seed.length == 0) || (seed instanceof Uint8Array && seed.length == 0)) {
     seed = null;
   }
-  console.log(`"got-init-data" seed=${JSON.stringify(seed)} device_id=${JSON.stringify(device_id)} config=${JSON.stringify(config)}`);
-  callbackList["got-init-data"](null, seed, device_id, config);
+  console.log(`"got-init-data" seed=${JSON.stringify(seed)} device_id=${JSON.stringify(device_id)} config=${JSON.stringify(config)} device_id_v2=${device_id_v2}`);
+  callbackList["got-init-data"](null, seed, device_id, config, device_id_v2);
 });
 
 chrome.braveSync.onFetchSyncRecords.addListener(function(category_names, start_at, max_records) {
   console.log(`"fetch-sync-records" category_names=${JSON.stringify(category_names)} start_at=${JSON.stringify(start_at)} max_records=${JSON.stringify(max_records)}`);
-  callbackList["fetch-sync-records"](null, category_names, start_at, max_records);
+  try {
+    callbackList["fetch-sync-records"](null, category_names, start_at, max_records);
+  } catch (e) {
+    console.error(e.message)
+    category_names.forEach((category) => {
+      chrome.braveSync.resolvedSyncRecords(category, []);
+    })
+  }
 });
 
 chrome.braveSync.onResolveSyncRecords.addListener(function(category_name, recordsAndExistingObjects) {
@@ -27,7 +34,12 @@ chrome.braveSync.onResolveSyncRecords.addListener(function(category_name, record
     }
   }
   console.log(`"resolve-sync-records" category_name=${JSON.stringify(category_name)} recordsAndExistingObjects=${JSON.stringify(recordsAndExistingObjectsArrArr)}`);
-  callbackList["resolve-sync-records"](null, category_name, recordsAndExistingObjectsArrArr);
+  try {
+    callbackList["resolve-sync-records"](null, category_name, recordsAndExistingObjectsArrArr);
+  } catch (e) {
+    console.error(e.message)
+    chrome.braveSync.resolvedSyncRecords(category_name, []);
+  }
 });
 
 chrome.braveSync.onSendSyncRecords.addListener(function(category_name, records) {
@@ -169,8 +181,8 @@ class InjectedObject {
         if (!arg1) {
           arg1 = null;
         }
-        console.log(`"save-init-data" seed=${JSON.stringify(arg1)} deviceId=${JSON.stringify(deviceId)}`);
-        chrome.braveSync.saveInitData(arg1/*seed*/, deviceId);
+        console.log(`"save-init-data" seed=${JSON.stringify(arg1)} deviceId=${JSON.stringify(deviceId)} deviceIdV2=${arg3}`);
+        chrome.braveSync.saveInitData(arg1/*seed*/, deviceId, arg3);
         break;
       case "sync-ready":
         console.log(`"sync-ready"`);
@@ -194,6 +206,10 @@ class InjectedObject {
       case "compacted-sync-category":
         console.log(`"compacted-sync-category" category=${JSON.stringify(arg1)} `);
         chrome.braveSync.onCompactComplete(arg1/*categoryName*/);
+        break;
+      case "sent-sync-records":
+        console.log(`"sent-sync-records" categoryName=${JSON.stringify(arg1)} records=${JSON.stringify(arg2)}`);
+        chrome.braveSync.onRecordsSent(arg1/*categoryName*/, arg2/*records*/);
         break;
       default:
         console.log('background.js TAGAB InjectedObject.handleMessage unknown message', message, arg1, arg2, arg3, arg4);

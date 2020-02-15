@@ -9,23 +9,27 @@
 #include "brave/browser/brave_browser_process_impl.h"
 #include "brave/common/brave_paths.h"
 #include "brave/common/pref_names.h"
+#include "brave/components/brave_component_updater/browser/local_data_files_service.h"
 #include "brave/components/brave_shields/browser/ad_block_custom_filters_service.h"
 #include "brave/components/brave_shields/browser/ad_block_regional_service.h"
 #include "brave/components/brave_shields/browser/ad_block_regional_service_manager.h"
 #include "brave/components/brave_shields/browser/ad_block_service.h"
-#include "brave/components/brave_component_updater/browser/local_data_files_service.h"
 #include "brave/components/brave_shields/browser/tracking_protection_service.h"
 #include "brave/components/brave_shields/common/brave_shield_constants.h"
+#include "brave/components/brave_shields/common/features.h"
 #include "brave/vendor/adblock_rust_ffi/src/wrapper.hpp"
 #include "chrome/browser/extensions/extension_browsertest.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/common/chrome_features.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/test/browser_test_utils.h"
+#include "extensions/test/extension_test_message_listener.h"
 #include "net/dns/mock_host_resolver.h"
 
+using brave_shields::features::kBraveAdblockCosmeticFiltering;
 using content::BrowserThread;
 using extensions::ExtensionBrowserTest;
 
@@ -86,21 +90,20 @@ class AdBlockServiceTest : public ExtensionBrowserTest {
     ASSERT_TRUE(g_brave_browser_process->ad_block_service()->IsInitialized());
   }
 
-  void UpdateAdBlockInstanceWithRules(const char* rules) {
-    g_brave_browser_process->ad_block_service()
-        ->ResetForTest(rules);
+  void UpdateAdBlockInstanceWithRules(const std::string& rules,
+                                      const std::string& resources = "") {
+    g_brave_browser_process->ad_block_service()->ResetForTest(rules, resources);
   }
 
   void AssertTagExists(const std::string& tag, bool expected_exists) const {
-    bool exists_default = g_brave_browser_process->ad_block_service()
-                              ->TagExists(tag);
+    bool exists_default =
+        g_brave_browser_process->ad_block_service()->TagExists(tag);
     ASSERT_EQ(exists_default, expected_exists);
 
     for (const auto& regional_service :
          g_brave_browser_process->ad_block_regional_service_manager()
              ->regional_services_) {
-      bool exists_regional =
-          regional_service.second->TagExists(tag);
+      bool exists_regional = regional_service.second->TagExists(tag);
       ASSERT_EQ(exists_regional, expected_exists);
     }
   }
@@ -190,8 +193,8 @@ class AdBlockServiceTest : public ExtensionBrowserTest {
     base::FilePath test_data_dir;
     GetTestDataDir(&test_data_dir);
     const extensions::Extension* tracking_protection_extension =
-        InstallExtension(
-            test_data_dir.AppendASCII("tracking-protection-data"), 1);
+        InstallExtension(test_data_dir.AppendASCII("tracking-protection-data"),
+                         1);
     if (!tracking_protection_extension)
       return false;
 
@@ -216,9 +219,17 @@ class AdBlockServiceTest : public ExtensionBrowserTest {
         g_brave_browser_process->local_data_files_service()->GetTaskRunner()));
     ASSERT_TRUE(tr_helper->Run());
     scoped_refptr<base::ThreadTestHelper> io_helper(new base::ThreadTestHelper(
-        base::CreateSingleThreadTaskRunnerWithTraits({BrowserThread::IO})
-            .get()));
+        base::CreateSingleThreadTaskRunner({BrowserThread::IO}).get()));
     ASSERT_TRUE(io_helper->Run());
+  }
+
+  void WaitForBraveExtensionShieldsDataReady() {
+    // Sometimes, the page can start loading before the Shields panel has
+    // received information about the window and tab it's loaded in.
+    ExtensionTestMessageListener extension_listener(
+        "brave-extension-shields-data-ready",
+        false);
+    ASSERT_TRUE(extension_listener.WaitUntilSatisfied());
   }
 };
 
@@ -521,7 +532,7 @@ IN_PROC_BROWSER_TEST_F(AdBlockServiceTest, SubFrame) {
 // This test is the same as AdsGetBlockedByRegionalBlocker except for at
 // the start it adds an exception rule to the non regional adblocker.
 IN_PROC_BROWSER_TEST_F(AdBlockServiceTest,
-    ExceptionAdsAreAllowedAcrossClients) {
+                       ExceptionAdsAreAllowedAcrossClients) {
   UpdateAdBlockInstanceWithRules("*ad_fr*\n@@*ad_fr.png*");
   g_browser_process->SetApplicationLocale("fr");
   ASSERT_STREQ(g_browser_process->GetApplicationLocale().c_str(), "fr");
@@ -552,19 +563,18 @@ IN_PROC_BROWSER_TEST_F(AdBlockServiceTest, AdBlockThirdPartyWorksByETLDP1) {
   UpdateAdBlockInstanceWithRules("||a.com$third-party");
   EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 0ULL);
 
-  GURL tab_url = embedded_test_server()->GetURL("test.a.com",
-      kAdBlockTestPage);
+  GURL tab_url = embedded_test_server()->GetURL("test.a.com", kAdBlockTestPage);
   GURL resource_url =
       embedded_test_server()->GetURL("test2.a.com", "/logo.png");
   ui_test_utils::NavigateToURL(browser(), tab_url);
   content::WebContents* contents =
       browser()->tab_strip_model()->GetActiveWebContents();
   bool as_expected = false;
-  ASSERT_TRUE(ExecuteScriptAndExtractBool(contents,
-      base::StringPrintf(
-          "setExpectations(1, 0, 0, 0, 0, 0);"
-          "addImage('%s')",
-      resource_url.spec().c_str()),
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+      contents,
+      base::StringPrintf("setExpectations(1, 0, 0, 0, 0, 0);"
+                         "addImage('%s')",
+                         resource_url.spec().c_str()),
       &as_expected));
   EXPECT_TRUE(as_expected);
   EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 0ULL);
@@ -572,22 +582,20 @@ IN_PROC_BROWSER_TEST_F(AdBlockServiceTest, AdBlockThirdPartyWorksByETLDP1) {
 
 // Make sure the third-party flag is passed into the ad-block library properly
 IN_PROC_BROWSER_TEST_F(AdBlockServiceTest,
-    AdBlockThirdPartyWorksForThirdPartyHost) {
+                       AdBlockThirdPartyWorksForThirdPartyHost) {
   UpdateAdBlockInstanceWithRules("||a.com$third-party");
   EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 0ULL);
-  GURL tab_url = embedded_test_server()->GetURL("b.com",
-      kAdBlockTestPage);
-  GURL resource_url =
-      embedded_test_server()->GetURL("a.com", "/logo.png");
+  GURL tab_url = embedded_test_server()->GetURL("b.com", kAdBlockTestPage);
+  GURL resource_url = embedded_test_server()->GetURL("a.com", "/logo.png");
   ui_test_utils::NavigateToURL(browser(), tab_url);
   content::WebContents* contents =
       browser()->tab_strip_model()->GetActiveWebContents();
   bool as_expected = false;
-  ASSERT_TRUE(ExecuteScriptAndExtractBool(contents,
-      base::StringPrintf(
-          "setExpectations(0, 1, 0, 0, 0, 0);"
-          "addImage('%s')",
-      resource_url.spec().c_str()),
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+      contents,
+      base::StringPrintf("setExpectations(0, 1, 0, 0, 0, 0);"
+                         "addImage('%s')",
+                         resource_url.spec().c_str()),
       &as_expected));
   EXPECT_TRUE(as_expected);
   EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 1ULL);
@@ -597,46 +605,46 @@ IN_PROC_BROWSER_TEST_F(AdBlockServiceTest,
 IN_PROC_BROWSER_TEST_F(AdBlockServiceTest, BlockNYP) {
   UpdateAdBlockInstanceWithRules("||sp1.nypost.com$third-party");
   EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 0ULL);
-  GURL tab_url = embedded_test_server()->GetURL("b.com",
-                                                kAdBlockTestPage);
+  GURL tab_url = embedded_test_server()->GetURL("b.com", kAdBlockTestPage);
   GURL resource_url =
-    embedded_test_server()->GetURL("sp1.nypost.com", "/logo.png");
+      embedded_test_server()->GetURL("sp1.nypost.com", "/logo.png");
   ui_test_utils::NavigateToURL(browser(), tab_url);
   content::WebContents* contents =
-    browser()->tab_strip_model()->GetActiveWebContents();
+      browser()->tab_strip_model()->GetActiveWebContents();
   bool as_expected = false;
-  ASSERT_TRUE(ExecuteScriptAndExtractBool(contents,
-                                          base::StringPrintf(
-                                            "setExpectations(0, 1, 0, 0, 0, 0);"
-                                            "addImage('%s')",
-                                            resource_url.spec().c_str()),
-                                          &as_expected));
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+      contents,
+      base::StringPrintf("setExpectations(0, 1, 0, 0, 0, 0);"
+                         "addImage('%s')",
+                         resource_url.spec().c_str()),
+      &as_expected));
   EXPECT_TRUE(as_expected);
   EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 1ULL);
 }
 
 // Tags for social buttons work
 IN_PROC_BROWSER_TEST_F(AdBlockServiceTest, SocialButttonAdBLockTagTest) {
-  UpdateAdBlockInstanceWithRules(base::StringPrintf("||example.com^$tag=%s",
-                    brave_shields::kFacebookEmbeds).c_str());
+  UpdateAdBlockInstanceWithRules(
+      base::StringPrintf("||example.com^$tag=%s",
+                         brave_shields::kFacebookEmbeds)
+          .c_str());
   EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 0ULL);
-  GURL tab_url = embedded_test_server()->GetURL("b.com",
-                                                kAdBlockTestPage);
+  GURL tab_url = embedded_test_server()->GetURL("b.com", kAdBlockTestPage);
   g_brave_browser_process->ad_block_service()->EnableTag(
       brave_shields::kFacebookEmbeds, true);
   WaitForAdBlockServiceThreads();
   GURL resource_url =
-    embedded_test_server()->GetURL("example.com", "/logo.png");
+      embedded_test_server()->GetURL("example.com", "/logo.png");
   ui_test_utils::NavigateToURL(browser(), tab_url);
   content::WebContents* contents =
-    browser()->tab_strip_model()->GetActiveWebContents();
+      browser()->tab_strip_model()->GetActiveWebContents();
   bool as_expected = false;
-  ASSERT_TRUE(ExecuteScriptAndExtractBool(contents,
-                                          base::StringPrintf(
-                                            "setExpectations(0, 1, 0, 0, 0, 0);"
-                                            "addImage('%s')",
-                                            resource_url.spec().c_str()),
-                                          &as_expected));
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+      contents,
+      base::StringPrintf("setExpectations(0, 1, 0, 0, 0, 0);"
+                         "addImage('%s')",
+                         resource_url.spec().c_str()),
+      &as_expected));
   EXPECT_TRUE(as_expected);
   EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 1ULL);
 }
@@ -645,23 +653,22 @@ IN_PROC_BROWSER_TEST_F(AdBlockServiceTest, SocialButttonAdBLockTagTest) {
 IN_PROC_BROWSER_TEST_F(AdBlockServiceTest, SocialButttonAdBlockDiffTagTest) {
   UpdateAdBlockInstanceWithRules("||example.com^$tag=sup");
   EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 0ULL);
-  GURL tab_url = embedded_test_server()->GetURL("b.com",
-                                                kAdBlockTestPage);
+  GURL tab_url = embedded_test_server()->GetURL("b.com", kAdBlockTestPage);
   g_brave_browser_process->ad_block_service()->EnableTag(
       brave_shields::kFacebookEmbeds, true);
   WaitForAdBlockServiceThreads();
   GURL resource_url =
-    embedded_test_server()->GetURL("example.com", "/logo.png");
+      embedded_test_server()->GetURL("example.com", "/logo.png");
   ui_test_utils::NavigateToURL(browser(), tab_url);
   content::WebContents* contents =
-    browser()->tab_strip_model()->GetActiveWebContents();
+      browser()->tab_strip_model()->GetActiveWebContents();
   bool as_expected = false;
-  ASSERT_TRUE(ExecuteScriptAndExtractBool(contents,
-                                          base::StringPrintf(
-                                            "setExpectations(1, 0, 0, 0, 0, 0);"
-                                            "addImage('%s')",
-                                            resource_url.spec().c_str()),
-                                          &as_expected));
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+      contents,
+      base::StringPrintf("setExpectations(1, 0, 0, 0, 0, 0);"
+                         "addImage('%s')",
+                         resource_url.spec().c_str()),
+      &as_expected));
   EXPECT_TRUE(as_expected);
   EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 0ULL);
 }
@@ -727,20 +734,246 @@ IN_PROC_BROWSER_TEST_F(AdBlockServiceTest, TagPrefsControlTags) {
 IN_PROC_BROWSER_TEST_F(AdBlockServiceTest, CancelRequestOptionTest) {
   UpdateAdBlockInstanceWithRules("logo.png$explicitcancel");
   EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 0ULL);
-  GURL tab_url = embedded_test_server()->GetURL("b.com",
-                                                kAdBlockTestPage);
+  GURL tab_url = embedded_test_server()->GetURL("b.com", kAdBlockTestPage);
   GURL resource_url =
-    embedded_test_server()->GetURL("example.com", "/logo.png");
+      embedded_test_server()->GetURL("example.com", "/logo.png");
   ui_test_utils::NavigateToURL(browser(), tab_url);
   content::WebContents* contents =
-    browser()->tab_strip_model()->GetActiveWebContents();
+      browser()->tab_strip_model()->GetActiveWebContents();
   bool as_expected = false;
-  ASSERT_TRUE(ExecuteScriptAndExtractBool(contents,
-                                          base::StringPrintf(
-                                            "setExpectations(0, 0, 1, 0, 0, 0);"
-                                            "addImage('%s')",
-                                            resource_url.spec().c_str()),
-                                          &as_expected));
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+      contents,
+      base::StringPrintf("setExpectations(0, 0, 1, 0, 0, 0);"
+                         "addImage('%s')",
+                         resource_url.spec().c_str()),
+      &as_expected));
   EXPECT_TRUE(as_expected);
   EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 1ULL);
+}
+
+// Load a page with a script which uses a redirect data URL.
+IN_PROC_BROWSER_TEST_F(AdBlockServiceTest, RedirectRulesAreRespected) {
+  UpdateAdBlockInstanceWithRules(
+      "js_mock_me.js$redirect=noopjs",
+      R"(
+      [
+        {
+          "name": "noop.js",
+          "aliases": ["noopjs"],
+          "kind": {
+            "mime":"application/javascript"
+          },
+          "content": "KGZ1bmN0aW9uKCkgewogICAgJ3VzZSBzdHJpY3QnOwp9KSgpOwo="
+        }
+      ])");
+  EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 0ULL);
+
+  const GURL url = embedded_test_server()->GetURL("example.com",
+                                                  kAdBlockTestPage);
+  ui_test_utils::NavigateToURL(browser(), url);
+  content::WebContents* contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+
+  const std::string noopjs = "(function() {\\n    \\'use strict\\';\\n})();\\n";
+  bool as_expected = false;
+  const GURL resource_url =
+      embedded_test_server()->GetURL("example.com", "/js_mock_me.js");
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+      contents,
+      base::StringPrintf("setExpectations(0, 0, 0, 1, 0, 0);"
+                         "xhr_expect_content('%s', '%s');",
+                         resource_url.spec().c_str(), noopjs.c_str()),
+      &as_expected));
+  EXPECT_TRUE(as_expected);
+  EXPECT_EQ(browser()->profile()->GetPrefs()->GetUint64(kAdsBlocked), 1ULL);
+}
+
+class CosmeticFilteringEnabledTest : public AdBlockServiceTest {
+ public:
+  CosmeticFilteringEnabledTest() {
+    feature_list_.InitAndEnableFeature(kBraveAdblockCosmeticFiltering);
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+// Ensure no cosmetic filtering occurs when the feature flag has not been
+// enabled
+IN_PROC_BROWSER_TEST_F(AdBlockServiceTest, CosmeticFilteringSimple) {
+  UpdateAdBlockInstanceWithRules(
+      "b.com###ad-banner\n"
+      "##.ad");
+
+  WaitForBraveExtensionShieldsDataReady();
+
+  GURL tab_url = embedded_test_server()->GetURL("b.com",
+                                                "/cosmetic_filtering.html");
+  ui_test_utils::NavigateToURL(browser(), tab_url);
+
+  content::WebContents* contents =
+    browser()->tab_strip_model()->GetActiveWebContents();
+
+  bool as_expected = false;
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+              contents,
+              "checkSelector('#ad-banner', 'display', 'block')",
+              &as_expected));
+  EXPECT_TRUE(as_expected);
+
+  as_expected = false;
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+              contents,
+              "checkSelector('.ad-banner', 'display', 'block')",
+              &as_expected));
+  EXPECT_TRUE(as_expected);
+
+  as_expected = false;
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+              contents,
+              "checkSelector('.ad', 'display', 'block')",
+              &as_expected));
+  EXPECT_TRUE(as_expected);
+}
+
+// Test simple cosmetic filtering
+IN_PROC_BROWSER_TEST_F(CosmeticFilteringEnabledTest, CosmeticFilteringSimple) {
+  UpdateAdBlockInstanceWithRules(
+      "b.com###ad-banner\n"
+      "##.ad");
+
+  WaitForBraveExtensionShieldsDataReady();
+
+  GURL tab_url = embedded_test_server()->GetURL("b.com",
+                                                "/cosmetic_filtering.html");
+  ui_test_utils::NavigateToURL(browser(), tab_url);
+
+  content::WebContents* contents =
+    browser()->tab_strip_model()->GetActiveWebContents();
+
+  bool as_expected = false;
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+              contents,
+              "checkSelector('#ad-banner', 'display', 'none')",
+              &as_expected));
+  EXPECT_TRUE(as_expected);
+
+  as_expected = false;
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+              contents,
+              "checkSelector('.ad-banner', 'display', 'block')",
+              &as_expected));
+  EXPECT_TRUE(as_expected);
+
+  as_expected = false;
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+              contents,
+              "checkSelector('.ad', 'display', 'none')",
+              &as_expected));
+  EXPECT_TRUE(as_expected);
+}
+
+// Test cosmetic filtering ignores content determined to be 1st party
+IN_PROC_BROWSER_TEST_F(CosmeticFilteringEnabledTest,
+                       CosmeticFilteringProtect1p) {
+  UpdateAdBlockInstanceWithRules("b.com##.fpsponsored\n");
+
+  WaitForBraveExtensionShieldsDataReady();
+
+  GURL tab_url = embedded_test_server()->GetURL("b.com",
+                                                "/cosmetic_filtering.html");
+  ui_test_utils::NavigateToURL(browser(), tab_url);
+
+  content::WebContents* contents =
+    browser()->tab_strip_model()->GetActiveWebContents();
+
+  bool as_expected = false;
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+              contents,
+              "checkSelector('.fpsponsored', 'display', 'block')",
+              &as_expected));
+  EXPECT_TRUE(as_expected);
+}
+
+// Test cosmetic filtering on elements added dynamically
+IN_PROC_BROWSER_TEST_F(CosmeticFilteringEnabledTest, CosmeticFilteringDynamic) {
+  UpdateAdBlockInstanceWithRules("##.blockme");
+
+  WaitForBraveExtensionShieldsDataReady();
+
+  GURL tab_url = embedded_test_server()->GetURL("b.com",
+                                                "/cosmetic_filtering.html");
+  ui_test_utils::NavigateToURL(browser(), tab_url);
+
+  content::WebContents* contents =
+    browser()->tab_strip_model()->GetActiveWebContents();
+
+  bool as_expected = false;
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+              contents,
+              "addElementsDynamically();\n"
+              "checkSelector('.blockme', 'display', 'none')",
+              &as_expected));
+  EXPECT_TRUE(as_expected);
+
+  as_expected = false;
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+              contents,
+              "checkSelector('.dontblockme', 'display', 'block')",
+              &as_expected));
+  EXPECT_TRUE(as_expected);
+}
+
+// Test custom style rules
+IN_PROC_BROWSER_TEST_F(CosmeticFilteringEnabledTest,
+                       CosmeticFilteringCustomStyle) {
+  UpdateAdBlockInstanceWithRules("b.com##.ad:style(padding-bottom: 10px)");
+
+  WaitForBraveExtensionShieldsDataReady();
+
+  GURL tab_url = embedded_test_server()->GetURL("b.com",
+                                                "/cosmetic_filtering.html");
+  ui_test_utils::NavigateToURL(browser(), tab_url);
+
+  content::WebContents* contents =
+    browser()->tab_strip_model()->GetActiveWebContents();
+
+  bool as_expected = false;
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+              contents,
+              "checkSelector('.ad', 'padding-bottom', '10px')",
+              &as_expected));
+  EXPECT_TRUE(as_expected);
+}
+
+// Test rules overridden by hostname-specific exception rules
+IN_PROC_BROWSER_TEST_F(CosmeticFilteringEnabledTest, CosmeticFilteringUnhide) {
+  UpdateAdBlockInstanceWithRules(
+      "##.ad\n"
+      "b.com#@#.ad\n"
+      "###ad-banner\n"
+      "a.com#@##ad-banner");
+
+  WaitForBraveExtensionShieldsDataReady();
+
+  GURL tab_url = embedded_test_server()->GetURL("b.com",
+                                                "/cosmetic_filtering.html");
+  ui_test_utils::NavigateToURL(browser(), tab_url);
+
+  content::WebContents* contents =
+    browser()->tab_strip_model()->GetActiveWebContents();
+
+  bool as_expected = false;
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+              contents,
+              "checkSelector('.ad', 'display', 'block')",
+              &as_expected));
+  EXPECT_TRUE(as_expected);
+
+  as_expected = false;
+  ASSERT_TRUE(ExecuteScriptAndExtractBool(
+              contents,
+              "checkSelector('#ad-banner', 'display', 'none')",
+              &as_expected));
+  EXPECT_TRUE(as_expected);
 }

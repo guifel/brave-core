@@ -19,11 +19,7 @@ class DatabaseContributionQueuePublishers: public DatabaseTable {
   explicit DatabaseContributionQueuePublishers(int current_db_version);
   ~DatabaseContributionQueuePublishers() override;
 
-  bool Init(sql::Database* db) override;
-
-  bool CreateTable(sql::Database* db) override;
-
-  bool CreateIndex(sql::Database* db) override;
+  bool Migrate(sql::Database* db, const int target) override;
 
   bool InsertOrUpdate(
       sql::Database* db,
@@ -33,10 +29,20 @@ class DatabaseContributionQueuePublishers: public DatabaseTable {
       sql::Database* db,
       const uint64_t queue_id);
 
+  bool DeleteRecordsByQueueId(sql::Database* db, const uint64_t queue_id);
+
+  bool DeleteAllRecords(sql::Database* db);
+
  private:
-  const char* table_name_ = "contribution_queue_publishers";
-  const int minimum_version_ = 9;
-  const char* parent_table_name_ = "contribution_queue";
+  bool CreateTableV9(sql::Database* db);
+
+  bool CreateTableV15(sql::Database* db);
+
+  bool CreateIndexV15(sql::Database* db);
+
+  bool MigrateToV9(sql::Database* db);
+
+  bool MigrateToV15(sql::Database* db);
 };
 
 }  // namespace brave_rewards

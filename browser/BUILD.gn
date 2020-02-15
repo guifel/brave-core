@@ -1,7 +1,10 @@
 import("//brave/build/config.gni")
 import("//brave/browser/tor/buildflags/buildflags.gni")
 import("//brave/components/brave_ads/browser/buildflags/buildflags.gni")
+import("//brave/components/brave_perf_predictor/browser/buildflags/buildflags.gni")
+import("//brave/components/brave_sync/buildflags/buildflags.gni")
 import("//brave/components/brave_wallet/browser/buildflags/buildflags.gni")
+import("//brave/components/brave_wayback_machine/buildflags/buildflags.gni")
 import("//brave/components/brave_webtorrent/browser/buildflags/buildflags.gni")
 import("//brave/components/greaselion/browser/buildflags/buildflags.gni")
 import("//build/buildflag_header.gni")
@@ -37,14 +40,10 @@ source_set("browser_process") {
     "brave_browser_main_extra_parts.h",
     "brave_browser_main_parts.cc",
     "brave_browser_main_parts.h",
-    "brave_browser_main_parts_mac.mm",
-    "brave_browser_main_parts_mac.h",
     "brave_browser_process_impl.cc",
     "brave_browser_process_impl.h",
     "brave_content_browser_client.cc",
     "brave_content_browser_client.h",
-    "brave_drm_tab_helper.cc",
-    "brave_drm_tab_helper.h",
     "brave_local_state_prefs.cc",
     "brave_local_state_prefs.h",
     "brave_profile_prefs.cc",
@@ -87,6 +86,13 @@ source_set("browser_process") {
     "update_util.h",
   ]
 
+  if (is_mac) {
+    sources += [
+      "brave_browser_main_parts_mac.h",
+      "brave_browser_main_parts_mac.mm",
+    ]
+  }
+
   if (enable_tor) {
     sources += [
       # TODO(bridiver) - change the directory for these
@@ -96,8 +102,8 @@ source_set("browser_process") {
   }
   if (enable_sparkle) {
     sources += [
-      "mac/sparkle_glue.mm",
       "mac/sparkle_glue.h",
+      "mac/sparkle_glue.mm",
       "mac/su_updater.h",
     ]
   }
@@ -106,17 +112,18 @@ source_set("browser_process") {
     ":sparkle_buildflags",
     ":version_info",
     "autoplay",
+    "content_settings",
     "download",
     "net",
     "permissions",
     "profiles",
     "renderer_context_menu",
-    "renderer_host",
     "ui",
     "//base",
+    "//brave/browser/net",
+    "//brave/browser/notifications",
     "//brave/browser/tor:buildflags",
     "//brave/browser/translate/buildflags",
-    "//brave/browser/notifications",
     "//brave/common",
     "//brave/common:pref_names",
     "//brave/components/brave_ads/browser",
@@ -125,15 +132,17 @@ source_set("browser_process") {
     "//brave/components/brave_referrals/browser",
     "//brave/components/brave_rewards/browser",
     "//brave/components/brave_shields/browser",
-    "//brave/components/brave_sync",
-    "//brave/components/brave_wallet/browser",
+    "//brave/components/brave_shields/common",
+    "//brave/components/brave_wayback_machine:buildflags",
     "//brave/components/brave_webtorrent/browser/buildflags",
     "//brave/components/content_settings/core/browser",
     "//brave/components/greaselion/browser/buildflags",
+    "//brave/components/ntp_sponsored_images/browser",
     "//brave/components/ntp_tiles",
     "//brave/components/p3a",
     "//brave/components/resources",
     "//brave/components/services:brave_content_manifest_overlays",
+    "//brave/services/network/public/cpp",
     "//chrome/common",
     "//components/autofill/core/common",
     "//components/browsing_data/core",
@@ -159,15 +168,30 @@ source_set("browser_process") {
     "//extensions/buildflags",
     "//brave/chromium_src:browser",
     "themes",
+    "ntp_sponsored_images",
     "//services/network/public/cpp",
     "//services/service_manager/embedder",
+    "//third_party/widevine/cdm:buildflags",
     "//ui/base",
   ]
+
+  if (brave_wallet_enabled) {
+    deps += [
+      "//brave/components/brave_wallet/browser",
+      "brave_wallet",
+    ]
+  }
 
   if (enable_greaselion) {
     deps += [
       "greaselion",
       "//brave/components/greaselion/browser",
+    ]
+  }
+
+  if (enable_brave_sync) {
+    deps += [
+      "//brave/components/brave_sync",
     ]
   }
 
@@ -188,6 +212,8 @@ source_set("browser_process") {
       "android/brave_shields_content_settings.cc",
       "android/brave_shields_content_settings.h",
       "android/brave_stats_updater_android.cc",
+      "android/brave_sync_worker.cc",
+      "android/brave_sync_worker.h",
       "android/preferences/background_video_playback_tab_helper.cc",
       "android/preferences/background_video_playback_tab_helper.h",
       "android/preferences/brave_pref_service_bridge.cc",
@@ -205,13 +231,19 @@ source_set("browser_process") {
         "//brave/vendor/bat-native-ledger",
       ]
     }
+
     if (brave_ads_enabled) {
       sources += [
         "brave_ads/android/brave_ads_native_helper.cc",
       ]
+
+      deps += [
+        "brave_ads/android:jni_headers",
+      ]
     }
 
     deps += [
+      "//brave/build/android:jni_headers",
       "//chrome/android:jni_headers",
     ]
   }
@@ -247,10 +279,23 @@ source_set("browser_process") {
     ]
   }
 
-  if (bundle_widevine_cdm || enable_widevine_cdm_component) {
+  if (enable_brave_wayback_machine) {
     deps += [
-      "//brave/browser/widevine",
-      "//third_party/widevine/cdm:buildflags",
+      "//brave/components/brave_wayback_machine",
+    ]
+  }
+
+  if (enable_widevine) {
+    sources += [
+      "brave_drm_tab_helper.cc",
+      "brave_drm_tab_helper.h",
+    ]
+    deps += [ "//brave/browser/widevine" ]
+  }
+
+  if (enable_brave_perf_predictor) {
+    deps += [
+      "//brave/components/brave_perf_predictor/browser",
     ]
   }
 

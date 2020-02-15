@@ -19,11 +19,17 @@
 #include "base/memory/memory_pressure_listener.h"
 #include "base/sequence_checker.h"
 #include "bat/ledger/mojom_structs.h"
-#include "brave/components/brave_rewards/browser/contribution_info.h"
+#include "brave/components/brave_rewards/browser/database/database_activity_info.h"
+#include "brave/components/brave_rewards/browser/database/database_contribution_info.h"
 #include "brave/components/brave_rewards/browser/database/database_contribution_queue.h"
+#include "brave/components/brave_rewards/browser/database/database_media_publisher_info.h"
+#include "brave/components/brave_rewards/browser/database/database_pending_contribution.h"
+#include "brave/components/brave_rewards/browser/database/database_promotion.h"
+#include "brave/components/brave_rewards/browser/database/database_publisher_info.h"
+#include "brave/components/brave_rewards/browser/database/database_recurring_tip.h"
 #include "brave/components/brave_rewards/browser/database/database_server_publisher_info.h"
+#include "brave/components/brave_rewards/browser/database/database_unblinded_token.h"
 #include "brave/components/brave_rewards/browser/pending_contribution.h"
-#include "brave/components/brave_rewards/browser/recurring_donation.h"
 #include "build/build_config.h"
 #include "sql/database.h"
 #include "sql/init_status.h"
@@ -44,13 +50,14 @@ class PublisherInfoDatabase {
     db_.set_error_callback(error_callback);
   }
 
-  bool InsertContributionInfo(const brave_rewards::ContributionInfo& info);
+  bool InsertOrUpdateContributionInfo(ledger::ContributionInfoPtr info);
 
-  void GetOneTimeTips(ledger::PublisherInfoList* list,
-                      ledger::ActivityMonth month,
-                      int year);
+  void GetOneTimeTips(
+      ledger::PublisherInfoList* list,
+      const ledger::ActivityMonth month,
+      const int year);
 
-  bool InsertOrUpdatePublisherInfo(const ledger::PublisherInfo& info);
+  bool InsertOrUpdatePublisherInfo(ledger::PublisherInfoPtr info);
 
   ledger::PublisherInfoPtr GetPublisherInfo(
      const std::string& media_key);
@@ -60,9 +67,9 @@ class PublisherInfoDatabase {
 
   bool RestorePublishers();
 
-  bool InsertOrUpdateActivityInfo(const ledger::PublisherInfo& info);
+  bool InsertOrUpdateActivityInfo(ledger::PublisherInfoPtr info);
 
-  bool InsertOrUpdateActivityInfos(const ledger::PublisherInfoList& list);
+  bool InsertOrUpdateActivityInfos(ledger::PublisherInfoList list);
 
   bool GetActivityList(int start,
                        int limit,
@@ -71,29 +78,27 @@ class PublisherInfoDatabase {
 
   bool GetExcludedList(ledger::PublisherInfoList* list);
 
-  bool InsertOrUpdateMediaPublisherInfo(const std::string& media_key,
-                                        const std::string& publisher_id);
+  bool InsertOrUpdateMediaPublisherInfo(
+      const std::string& media_key,
+      const std::string& publisher_key);
 
   ledger::PublisherInfoPtr GetMediaPublisherInfo(
       const std::string& media_key);
 
-  bool InsertOrUpdateRecurringTip(
-      const brave_rewards::RecurringDonation& info);
+  bool InsertOrUpdateRecurringTip(ledger::RecurringTipPtr info);
 
   void GetRecurringTips(ledger::PublisherInfoList* list);
 
   bool RemoveRecurringTip(const std::string& publisher_key);
 
-  bool InsertPendingContribution(const ledger::PendingContributionList& list);
+  bool InsertPendingContribution(ledger::PendingContributionList list);
 
   double GetReservedAmount();
 
   void GetPendingContributions(
       ledger::PendingContributionInfoList* list);
 
-  bool RemovePendingContributions(const std::string& publisher_key,
-                                  const std::string& viewing_id,
-                                  uint64_t added_date);
+  bool RemovePendingContributions(const uint64_t id);
 
   bool RemoveAllPendingContributions();
 
@@ -109,6 +114,21 @@ class PublisherInfoDatabase {
 
   bool DeleteContributionQueue(const uint64_t id);
 
+  bool InsertOrUpdatePromotion(ledger::PromotionPtr info);
+
+  ledger::PromotionPtr GetPromotion(const std::string& id);
+
+  ledger::PromotionMap GetAllPromotions();
+
+  bool InsertOrUpdateUnblindedToken(ledger::UnblindedTokenPtr info);
+
+  ledger::UnblindedTokenList GetAllUnblindedTokens();
+
+  bool DeleteUnblindedTokens(const std::vector<std::string>& id_list);
+
+  bool DeleteUnblindedTokensForPromotion(
+      const std::string& promotion_id);
+
   void RecordP3AStats(bool auto_contributions_on);
 
   // Returns the current version of the publisher info database
@@ -116,6 +136,31 @@ class PublisherInfoDatabase {
 
   bool DeleteActivityInfo(const std::string& publisher_key,
                           uint64_t reconcile_stamp);
+
+  void GetTransactionReport(
+      ledger::TransactionReportInfoList* list,
+      const ledger::ActivityMonth month,
+      const int year);
+
+  void GetContributionReport(
+      ledger::ContributionReportInfoList* list,
+      const ledger::ActivityMonth month,
+      const int year);
+
+  void GetIncompleteContributions(
+      ledger::ContributionInfoList* list);
+
+  ledger::ContributionInfoPtr GetContributionInfo(
+      const std::string& contribution_id);
+
+  bool UpdateContributionInfoStepAndCount(
+      const std::string& contribution_id,
+      const ledger::ContributionStep step,
+      const int32_t retry_count);
+
+  bool UpdateContributionInfoContributedAmount(
+      const std::string& contribution_id,
+      const std::string& publisher_key);
 
   // Vacuums the database. This will cause sqlite to defragment and collect
   // unused space in the file. It can be VERY SLOW.
@@ -132,30 +177,16 @@ class PublisherInfoDatabase {
   std::string GetSchema();
 
  private:
-  bool CreateContributionInfoTable();
-
-  bool CreateContributionInfoIndex();
-
-  bool CreatePublisherInfoTable();
-
-  bool CreateActivityInfoTable();
-
-  bool CreateActivityInfoIndex();
-
-  bool CreateMediaPublisherInfoTable();
-
-  bool CreateRecurringTipsTable();
-
-  bool CreateRecurringTipsIndex();
-
-  bool CreatePendingContributionsTable();
-
-  bool CreatePendingContributionsIndex();
+  bool IsInitialized();
 
   void OnMemoryPressure(
     base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level);
 
+  bool InitMetaTable(const int version);
+
   sql::MetaTable& GetMetaTable();
+
+  bool MigrateV0toV1();
 
   bool MigrateV1toV2();
 
@@ -170,36 +201,24 @@ class PublisherInfoDatabase {
   bool MigrateV6toV7();
 
   bool MigrateV7toV8();
-  bool MigrateToV8ContributionInfoTable();
-  bool CreateV8ContributionInfoTable();
-  bool CreateV8ContributionInfoIndex();
-  bool MigrateToV8PendingContributionsTable();
-  bool CreateV8PendingContributionsTable();
-  bool CreateV8PendingContributionsIndex();
 
   bool MigrateV8toV9();
 
+  bool MigrateV9toV10();
+
+  bool MigrateV10toV11();
+
+  bool MigrateV11toV12();
+
+  bool MigrateV12toV13();
+
+  bool MigrateV13toV14();
+
+  bool MigrateV14toV15();
+
   bool Migrate(int version);
 
-  bool MigrateDBTable(
-      const std::string& from,
-      const std::string& to,
-      const std::vector<std::string>& columns,
-      const bool should_drop);
-  bool MigrateDBTable(
-      const std::string& from,
-      const std::string& to,
-      const std::map<std::string, std::string>& columns,
-      const bool should_drop);
-  bool RenameDBTable(
-      const std::string& from,
-      const std::string& to);
-  std::string GenerateDBInsertQuery(
-      const std::string& from,
-      const std::string& to,
-      const std::map<std::string, std::string>& columns);
-
-  sql::InitStatus EnsureCurrentVersion();
+  sql::InitStatus EnsureCurrentVersion(const int table_version);
 
   sql::Database db_;
   sql::MetaTable meta_table_;
@@ -210,6 +229,14 @@ class PublisherInfoDatabase {
   std::unique_ptr<base::MemoryPressureListener> memory_pressure_listener_;
   std::unique_ptr<DatabaseServerPublisherInfo> server_publisher_info_;
   std::unique_ptr<DatabaseContributionQueue> contribution_queue_;
+  std::unique_ptr<DatabasePromotion> promotion_;
+  std::unique_ptr<DatabaseUnblindedToken> unblinded_token_;
+  std::unique_ptr<DatabaseContributionInfo> contribution_info_;
+  std::unique_ptr<DatabasePendingContribution> pending_contribution_;
+  std::unique_ptr<DatabaseMediaPublisherInfo> media_publisher_info_;
+  std::unique_ptr<DatabaseRecurringTip> recurring_tip_;
+  std::unique_ptr<DatabasePublisherInfo> publisher_info_;
+  std::unique_ptr<DatabaseActivityInfo> activity_info_;
 
   SEQUENCE_CHECKER(sequence_checker_);
   DISALLOW_COPY_AND_ASSIGN(PublisherInfoDatabase);

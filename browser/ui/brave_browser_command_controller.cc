@@ -24,11 +24,7 @@
 #include "components/prefs/pref_service.h"
 
 #if BUILDFLAG(ENABLE_BRAVE_SYNC)
-#include "brave/components/brave_sync/switches.h"
-#endif
-
-#if BUILDFLAG(ENABLE_TOR)
-#include "brave/browser/tor/tor_profile_service.h"
+#include "components/sync/driver/sync_driver_switches.h"
 #endif
 
 namespace {
@@ -118,11 +114,12 @@ void BraveBrowserCommandController::InitBraveCommandState() {
     UpdateCommandForBraveWallet();
 #endif
 #if BUILDFLAG(ENABLE_BRAVE_SYNC)
-    if (brave_sync::switches::IsBraveSyncAllowedByFlag())
+    if (switches::IsSyncAllowedByFlag())
       UpdateCommandForBraveSync();
 #endif
   }
   UpdateCommandForBraveAdblock();
+  UpdateCommandForWebcompatReporter();
 #if BUILDFLAG(ENABLE_TOR)
   UpdateCommandForTor();
 #endif
@@ -138,13 +135,19 @@ void BraveBrowserCommandController::UpdateCommandForBraveAdblock() {
   UpdateCommandEnabled(IDC_SHOW_BRAVE_ADBLOCK, true);
 }
 
-void BraveBrowserCommandController::UpdateCommandForTor() {
-#if BUILDFLAG(ENABLE_TOR)
-  const bool is_tor_enabled = !tor::TorProfileService::IsTorDisabled();
-  UpdateCommandEnabled(IDC_NEW_TOR_CONNECTION_FOR_SITE, is_tor_enabled);
-  UpdateCommandEnabled(IDC_NEW_OFFTHERECORD_WINDOW_TOR, is_tor_enabled);
-#endif
+void BraveBrowserCommandController::UpdateCommandForWebcompatReporter() {
+  UpdateCommandEnabled(IDC_SHOW_BRAVE_WEBCOMPAT_REPORTER, true);
 }
+
+#if BUILDFLAG(ENABLE_TOR)
+void BraveBrowserCommandController::UpdateCommandForTor() {
+  // Enable new tor connection only for tor profile.
+  UpdateCommandEnabled(IDC_NEW_TOR_CONNECTION_FOR_SITE,
+                       brave::IsTorProfile(browser_->profile()));
+  UpdateCommandEnabled(IDC_NEW_OFFTHERECORD_WINDOW_TOR,
+                       !brave::IsTorDisabledForProfile(browser_->profile()));
+}
+#endif
 
 void BraveBrowserCommandController::UpdateCommandForBraveSync() {
   UpdateCommandEnabled(IDC_SHOW_BRAVE_SYNC, true);
@@ -186,6 +189,9 @@ bool BraveBrowserCommandController::ExecuteBraveCommandWithDisposition(
       break;
     case IDC_SHOW_BRAVE_ADBLOCK:
       brave::ShowBraveAdblock(browser_);
+      break;
+    case IDC_SHOW_BRAVE_WEBCOMPAT_REPORTER:
+      brave::ShowWebcompatReporter(browser_);
       break;
     case IDC_NEW_OFFTHERECORD_WINDOW_TOR:
       brave::NewOffTheRecordWindowTor(browser_);

@@ -1,8 +1,8 @@
 diff --git a/chrome/android/java/AndroidManifest.xml b/chrome/android/java/AndroidManifest.xml
-index 9f95291191e896e0ce9691941fc0fa8d5323a1ed..b1729b5a3f5ffe8c8a871a766a325ca485f15240 100644
+index 4a4ef4f6a6245b36b39f1f901bf13c6d8a8c42f8..4011af4a1c7232075ec94fe28716cf5e76b0d9d0 100644
 --- a/chrome/android/java/AndroidManifest.xml
 +++ b/chrome/android/java/AndroidManifest.xml
-@@ -1344,6 +1344,7 @@ android:value="true" />
+@@ -1307,6 +1307,7 @@ android:value="true" />
          </activity>
          {% endif %}
  

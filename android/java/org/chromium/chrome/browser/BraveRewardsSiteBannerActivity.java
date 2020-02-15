@@ -35,7 +35,7 @@ import org.chromium.chrome.browser.ChromeTabbedActivity;
 import android.graphics.Bitmap;
 import android.widget.ImageView;
 import org.chromium.chrome.browser.tab.Tab;
-import org.chromium.chrome.browser.widget.RoundedIconGenerator;
+import org.chromium.chrome.browser.ui.widget.RoundedIconGenerator;
 import org.chromium.base.task.AsyncTask;
 import android.graphics.BitmapFactory;
 import org.chromium.base.annotations.CalledByNative;
@@ -298,8 +298,9 @@ public class BraveRewardsSiteBannerActivity extends Activity implements BraveRew
                     return false;
                 }
             });
+        } else {
+            findViewById(R.id.publisher_favicon_verified).setVisibility(View.VISIBLE);
         }
-
 
         RelativeLayout monthly_layout = ((RelativeLayout)findViewById(R.id.monthly_contribution));
         if (mBraveRewardsNativeWorker.IsCurrentPublisherInRecurrentDonations(mBraveRewardsNativeWorker.GetPublisherId(currentTabId_))) {
@@ -454,7 +455,7 @@ public class BraveRewardsSiteBannerActivity extends Activity implements BraveRew
     public void OnPublisherInfo(int tabId){}
 
     @Override
-    public void OnGetCurrentBalanceReport(String[] report){}
+    public void OnGetCurrentBalanceReport(double[] report){}
 
     @Override
     public void OnNotificationAdded(String id, int type, long timestamp, String[] args) {}
@@ -491,4 +492,7 @@ public class BraveRewardsSiteBannerActivity extends Activity implements BraveRew
 
     @Override
     public void OnRewardsMainEnabled(boolean enabled) {}
+
+    @Override
+    public void OnFetchPromotions() {}
 }

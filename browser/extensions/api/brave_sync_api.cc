@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <utility>
+#include <string>
 #include <vector>
 
 #include "brave/common/extensions/api/brave_sync.h"
@@ -88,7 +89,8 @@ ExtensionFunction::ResponseAction BraveSyncSaveInitDataFunction::Run() {
   DCHECK(sync_service);
   sync_service->GetBraveSyncClient()->sync_message_handler()->OnSaveInitData(
       params->seed ? *params->seed : std::vector<uint8_t>(),
-      params->device_id ? *params->device_id : std::vector<uint8_t>());
+      params->device_id ? *params->device_id : std::vector<uint8_t>(),
+      params->device_id_v2 ? *params->device_id_v2 : std::string());
 
   return RespondNow(NoArguments());
 }
@@ -164,6 +166,24 @@ BraveSyncOnCompactCompleteFunction::Run() {
   sync_service->GetBraveSyncClient()
       ->sync_message_handler()
       ->OnCompactComplete(params->category_name);
+
+  return RespondNow(NoArguments());
+}
+
+ExtensionFunction::ResponseAction
+BraveSyncOnRecordsSentFunction::Run() {
+  std::unique_ptr<brave_sync::OnRecordsSent::Params> params(
+      brave_sync::OnRecordsSent::Params::Create(*args_));
+  EXTENSION_FUNCTION_VALIDATE(params.get());
+
+  auto records = std::make_unique<std::vector<::brave_sync::SyncRecordPtr>>();
+  ::brave_sync::ConvertSyncRecords(params->records, records.get());
+
+  BraveSyncService* sync_service = GetSyncService(browser_context());
+  DCHECK(sync_service);
+  sync_service->GetBraveSyncClient()
+      ->sync_message_handler()
+      ->OnRecordsSent(params->category_name, std::move(records));
 
   return RespondNow(NoArguments());
 }

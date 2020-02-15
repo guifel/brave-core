@@ -10,7 +10,6 @@
 #include "base/test/scoped_feature_list.h"
 #include "build/buildflag.h"
 #include "chrome/browser/prefs/browser_prefs.h"
-#include "chrome/browser/signin/scoped_account_consistency.h"
 #include "chrome/browser/supervised_user/supervised_user_constants.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/prefs/pref_notifier_impl.h"
@@ -26,7 +25,7 @@
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
 // Checks that new profiles are migrated at creation.
 TEST(AccountConsistencyDisabledTest, NewProfile) {
-  content::TestBrowserThreadBundle test_thread_bundle;
+  content::BrowserTaskEnvironment task_environment;
   // kSignInProcessIsolation used to be needed here but it has since been
   // turned on to 100% of the user base and is no longer needed.
   // See 36417aa39a5e8484b23f1ec927bfda23465f4f21
@@ -52,7 +51,7 @@ TEST(AccountConsistencyDisabledTest, NewProfile) {
 }
 
 TEST(AccountConsistencyDisabledTest, DiceFixAuthErrorsForAllProfiles) {
-  content::TestBrowserThreadBundle test_thread_bundle;
+  content::BrowserTaskEnvironment task_environment;
 
   {
     // Regular profile.

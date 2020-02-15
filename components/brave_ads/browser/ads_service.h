@@ -53,6 +53,10 @@ class AdsService : public KeyedService {
   virtual void SetEnabled(
       const bool is_enabled) = 0;
 
+  virtual bool ShouldAllowAdConversionTracking() const = 0;
+  virtual void SetAllowAdConversionTracking(
+      const bool should_allow) = 0;
+
   virtual uint64_t GetAdsPerHour() const = 0;
   virtual void SetAdsPerHour(
       const uint64_t ads_per_hour) = 0;
@@ -80,6 +84,8 @@ class AdsService : public KeyedService {
       const SessionID& tab_id) = 0;
 
   virtual void GetAdsHistory(
+      const uint64_t from_timestamp,
+      const uint64_t to_timestamp,
       OnGetAdsHistoryCallback callback) = 0;
 
   virtual void ToggleAdThumbUp(

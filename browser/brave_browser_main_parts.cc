@@ -9,7 +9,10 @@
 #include "brave/browser/browsing_data/brave_clear_browsing_data.h"
 #include "brave/browser/tor/buildflags.h"
 #include "brave/common/pref_names.h"
+#include "brave/components/brave_sync/features.h"
+#include "chrome/common/chrome_features.h"
 #include "components/prefs/pref_service.h"
+#include "components/sync/driver/sync_driver_switches.h"
 #include "content/public/browser/render_frame_host.h"
 #include "media/base/media_switches.h"
 
@@ -55,7 +58,9 @@ void BraveBrowserMainParts::PostBrowserStart() {
         profile_manager->GetProfileAttributesStorage();
     if (!storage.GetProfileAttributesWithPath(tor_legacy_path, &entry)) {
       storage.AddProfile(tor_legacy_path, base::string16(), std::string(),
-                         base::string16(), 0, std::string(), EmptyAccountId());
+                         base::string16(),
+                         /* is_consented_primary_account*/ false, 0,
+                         std::string(), EmptyAccountId());
     }
 
     profile_manager->MaybeScheduleProfileForDeletion(
@@ -86,6 +91,21 @@ void BraveBrowserMainParts::PostBrowserStart() {
 
 void BraveBrowserMainParts::PreShutdown() {
   content::BraveClearBrowsingData::ClearOnExit();
+}
+
+void BraveBrowserMainParts::PreProfileInit() {
+  ChromeBrowserMainParts::PreProfileInit();
+#if !defined(OS_ANDROID)
+  auto* command_line = base::CommandLine::ForCurrentProcess();
+  if (!base::FeatureList::IsEnabled(brave_sync::features::kBraveSync)) {
+    // Disable sync temporarily
+    command_line->AppendSwitch(switches::kDisableSync);
+  } else {
+    // Relaunch after flag changes will still have the switch
+    // when switching from disabled to enabled
+    command_line->RemoveSwitch(switches::kDisableSync);
+  }
+#endif
 }
 
 void BraveBrowserMainParts::PostProfileInit() {

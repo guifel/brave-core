@@ -5,15 +5,21 @@
 
 #include "brave/browser/brave_profile_prefs.h"
 
+#include "brave/browser/themes/brave_dark_mode_utils.h"
+#include "brave/common/brave_wallet_constants.h"
 #include "brave/common/pref_names.h"
+#include "brave/components/brave_perf_predictor/browser/buildflags.h"
 #include "brave/components/brave_shields/browser/brave_shields_web_contents_observer.h"
 #include "brave/components/brave_sync/brave_sync_prefs.h"
+#include "brave/components/brave_wallet/browser/buildflags/buildflags.h"
+#include "brave/components/brave_wayback_machine/buildflags.h"
 #include "brave/components/brave_webtorrent/browser/buildflags/buildflags.h"
 #include "chrome/browser/net/prediction_options.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/common/pref_names.h"
 #include "components/content_settings/core/common/pref_names.h"
 #include "components/gcm_driver/gcm_buildflags.h"
+#include "components/password_manager/core/common/password_manager_pref_names.h"
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/safe_browsing/common/safe_browsing_prefs.h"
 #include "components/signin/public/base/signin_pref_names.h"
@@ -21,10 +27,6 @@
 #include "extensions/buildflags/buildflags.h"
 #include "extensions/common/feature_switch.h"
 #include "third_party/widevine/cdm/buildflags.h"
-
-#if BUILDFLAG(BUNDLE_WIDEVINE_CDM)
-#include "brave/browser/widevine/brave_widevine_bundle_manager.h"
-#endif
 
 #if BUILDFLAG(ENABLE_BRAVE_WEBTORRENT)
 #include "brave/components/brave_webtorrent/browser/webtorrent_util.h"
@@ -38,13 +40,48 @@
 #include "components/gcm_driver/gcm_channel_status_syncer.h"
 #endif
 
+#if BUILDFLAG(ENABLE_WIDEVINE)
+#include "brave/browser/widevine/widevine_utils.h"
+#endif
+
+#if BUILDFLAG(ENABLE_BRAVE_WAYBACK_MACHINE)
+#include "brave/components/brave_wayback_machine/pref_names.h"
+#endif
+
+#if BUILDFLAG(BRAVE_WALLET_ENABLED)
+#include "brave/browser/brave_wallet/brave_wallet_utils.h"
+#endif
+
+#if BUILDFLAG(ENABLE_BRAVE_PERF_PREDICTOR)
+#include "brave/components/brave_perf_predictor/browser/perf_predictor_tab_helper.h"
+#include "brave/components/brave_perf_predictor/browser/p3a_bandwidth_savings_tracker.h"
+#endif
+
 using extensions::FeatureSwitch;
 
 namespace brave {
 
+void RegisterProfilePrefsForMigration(
+    user_prefs::PrefRegistrySyncable* registry) {
+#if BUILDFLAG(ENABLE_WIDEVINE)
+  RegisterWidevineProfilePrefsForMigration(registry);
+#endif
+
+  dark_mode::RegisterBraveDarkModePrefsForMigration(registry);
+
+#if BUILDFLAG(BRAVE_WALLET_ENABLED)
+  brave_wallet::RegisterBraveWalletProfilePrefsForMigration(registry);
+#endif
+}
+
 void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   brave_shields::BraveShieldsWebContentsObserver::RegisterProfilePrefs(
       registry);
+
+#if BUILDFLAG(ENABLE_BRAVE_PERF_PREDICTOR)
+  brave_perf_predictor::PerfPredictorTabHelper::RegisterProfilePrefs(registry);
+  brave_perf_predictor::P3ABandwidthSavingsTracker::RegisterPrefs(registry);
+#endif
 
   // appearance
   registry->RegisterBooleanPref(kLocationBarIsWide, false);
@@ -52,11 +89,11 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
 
   brave_sync::prefs::Prefs::RegisterProfilePrefs(registry);
 
-  registry->RegisterBooleanPref(kWidevineOptedIn, false);
+  // TODO(shong): Migrate this to local state also and guard in ENABLE_WIDEVINE.
+  // We don't need to display "don't ask widevine prompt option" in settings
+  // if widevine is disabled.
+  // F/u issue: https://github.com/brave/brave-browser/issues/7000
   registry->RegisterBooleanPref(kAskWidevineInstall, true);
-#if BUILDFLAG(BUNDLE_WIDEVINE_CDM)
-  BraveWidevineBundleManager::RegisterProfilePrefs(registry);
-#endif
 
   // Default Brave shields
   registry->RegisterBooleanPref(kHTTPSEVerywhereControlType, true);
@@ -65,9 +102,9 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   // > advanced view is defaulted to true for EXISTING users; false for new
   bool is_new_user = false;
 
-  #if !defined(OS_ANDROID)
+#if !defined(OS_ANDROID)
   is_new_user = first_run::IsChromeFirstRun();
-  #endif
+#endif
 
 #if !BUILDFLAG(USE_GCM_FROM_PLATFORM)
   // PushMessaging
@@ -77,6 +114,9 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
 
   registry->RegisterBooleanPref(kShieldsAdvancedViewEnabled,
                                 is_new_user == false);
+
+  // Google-oauth should work by default
+  registry->RegisterBooleanPref(kGoogleLoginControlType, true);
   registry->RegisterBooleanPref(kFBEmbedControlType, true);
   registry->RegisterBooleanPref(kTwitterEmbedControlType, true);
   registry->RegisterBooleanPref(kLinkedInEmbedControlType, false);
@@ -84,6 +124,11 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   // WebTorrent
 #if BUILDFLAG(ENABLE_BRAVE_WEBTORRENT)
   webtorrent::RegisterProfilePrefs(registry);
+#endif
+
+  // wayback machine
+#if BUILDFLAG(ENABLE_BRAVE_WAYBACK_MACHINE)
+  registry->RegisterBooleanPref(kBraveWaybackMachineEnabled, true);
 #endif
 
 #if defined(OS_ANDROID)
@@ -163,12 +208,24 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterBooleanPref(kNewTabPageShowRewards, true);
 
   // Brave Wallet
+  registry->RegisterIntegerPref(kBraveWalletPrefVersion, 0);
   registry->RegisterStringPref(kBraveWalletAES256GCMSivNonce, "");
   registry->RegisterStringPref(kBraveWalletEncryptedSeed, "");
-  registry->RegisterBooleanPref(kBraveWalletEnabled, true);
+  registry->RegisterIntegerPref(kBraveWalletWeb3Provider,
+      static_cast<int>(BraveWalletWeb3ProviderTypes::ASK));
+
+  // Autocomplete in address bar
+  registry->RegisterBooleanPref(kAutocompleteEnabled, true);
 
   // Tab settings
   registry->RegisterBooleanPref(kMRUCyclingEnabled, false);
+
+  // Password leak detection should be disabled
+  registry->SetDefaultPrefValue(
+      password_manager::prefs::kPasswordLeakDetectionEnabled,
+      base::Value(false));
+
+  RegisterProfilePrefsForMigration(registry);
 }
 
 }  // namespace brave

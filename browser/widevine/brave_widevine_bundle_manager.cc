@@ -15,19 +15,18 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/logging.h"
+#include "base/native_library.h"
 #include "base/path_service.h"
 #include "base/strings/string_piece.h"
 #include "base/task/post_task.h"
 #include "brave/browser/widevine/brave_widevine_bundle_unzipper.h"
-#include "brave/common/pref_names.h"
+#include "brave/browser/widevine/widevine_utils.h"
 #include "brave/common/brave_switches.h"
 #include "brave/grit/brave_generated_resources.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/net/system_network_context_manager.h"
-#include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/common/chrome_paths.h"
 #include "components/prefs/pref_service.h"
-#include "components/pref_registry/pref_registry_syncable.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/common/cdm_info.h"
 #include "content/public/browser/cdm_registry.h"
@@ -61,37 +60,22 @@ base::Optional<base::FilePath> GetTargetWidevineBundleDir() {
 void ResetWidevinePrefs() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
-  Profile* profile = ProfileManager::GetActiveUserProfile();
-  DCHECK(profile);
-
-  profile->GetPrefs()->SetBoolean(kWidevineOptedIn, false);
-  profile->GetPrefs()->SetString(
-      kWidevineInstalledVersion,
+  SetWidevineOptedIn(false);
+  SetWidevineInstalledVersion(
       BraveWidevineBundleManager::kWidevineInvalidVersion);
 }
 
 void SetWidevinePrefsAsInstalledState() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
-  Profile* profile = ProfileManager::GetActiveUserProfile();
-  DCHECK(profile);
-
-  profile->GetPrefs()->SetBoolean(kWidevineOptedIn, true);
-  profile->GetPrefs()->SetString(kWidevineInstalledVersion,
-                                 WIDEVINE_CDM_VERSION_STRING);
+  SetWidevineOptedIn(true);
+  SetWidevineInstalledVersion(WIDEVINE_CDM_VERSION_STRING);
 }
 
 }  // namespace
 
 // static
 char BraveWidevineBundleManager::kWidevineInvalidVersion[] = "";
-
-// static
-void BraveWidevineBundleManager::RegisterProfilePrefs(
-    user_prefs::PrefRegistrySyncable* registry) {
-  registry->RegisterStringPref(kWidevineInstalledVersion,
-                               kWidevineInvalidVersion);
-}
 
 BraveWidevineBundleManager::BraveWidevineBundleManager() : weak_factory_(this) {
 }
@@ -115,6 +99,7 @@ void BraveWidevineBundleManager::InstallWidevineBundle(
       GURL(WIDEVINE_CDM_DOWNLOAD_URL_STRING),
       base::BindOnce(&BraveWidevineBundleManager::OnBundleDownloaded,
                      base::Unretained(this)));
+  DeleteDeprecatedWidevineCdmLib();
 }
 
 void BraveWidevineBundleManager::DownloadWidevineBundle(
@@ -267,19 +252,15 @@ void BraveWidevineBundleManager::StartupCheck() {
     return;
   }
 
-  Profile* profile = ProfileManager::GetActiveUserProfile();
-  DCHECK(profile);
-
   // Although this case would be very rare, this might be happen because
   // bundle unzipping and prefs setting is done asynchronously.
-  if (!profile->GetPrefs()->GetBoolean(kWidevineOptedIn)) {
+  if (!IsWidevineOptedIn()) {
     DVLOG(1) << __func__ << ": recover invalid widevine prefs state";
     SetWidevinePrefsAsInstalledState();
     return;
   }
 
-  const std::string installed_version =
-      profile->GetPrefs()->GetString(kWidevineInstalledVersion);
+  const std::string installed_version = GetWidevineInstalledVersion();
 
   DVLOG(1) << __func__ << ": widevine prefs state looks fine";
   DVLOG(1) << __func__ << ": installed widevine version: " << installed_version;
@@ -296,6 +277,26 @@ void BraveWidevineBundleManager::StartupCheck() {
   }
 
   DVLOG(1) << __func__ << ": latest widevine version is installed.";
+}
+
+void BraveWidevineBundleManager::DeleteDeprecatedWidevineCdmLib() {
+  if (is_test_) return;
+
+  file_task_runner()->PostTask(
+      FROM_HERE,
+      base::BindOnce(
+          []() {
+            base::FilePath deprecated_widevine_cdm_lib;
+            if (base::PathService::Get(chrome::DIR_USER_DATA,
+                                       &deprecated_widevine_cdm_lib)) {
+              base::DeleteFile(
+                  deprecated_widevine_cdm_lib
+                      .Append(kWidevineCdmBaseDirectory)
+                      .Append(base::GetNativeLibraryName(
+                          kWidevineCdmLibraryName)),
+                  false);
+            }
+          }));
 }
 
 void BraveWidevineBundleManager::ScheduleBackgroundUpdate() {
@@ -327,9 +328,7 @@ void BraveWidevineBundleManager::OnBackgroundUpdateFinished(
 void BraveWidevineBundleManager::DoDelayedBackgroundUpdate() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
-  Profile* profile = ProfileManager::GetActiveUserProfile();
-  const std::string installed_version =
-      profile->GetPrefs()->GetString(kWidevineInstalledVersion);
+  const std::string installed_version = GetWidevineInstalledVersion();
 
   DVLOG(1) << __func__ << ": update widevine"
            << " from " << installed_version
@@ -358,7 +357,7 @@ void BraveWidevineBundleManager::WillRestart() const {
 scoped_refptr<base::SequencedTaskRunner>
 BraveWidevineBundleManager::file_task_runner() {
   if (!file_task_runner_) {
-    file_task_runner_ = base::CreateSequencedTaskRunnerWithTraits(
+    file_task_runner_ = base::CreateSequencedTaskRunner(
         {base::ThreadPool(), base::MayBlock(), base::TaskPriority::BEST_EFFORT,
          base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN});
   }

@@ -24,9 +24,9 @@ void RecordP3A(uint64_t answers_count) {
   int answer = 0;
   if (1 <= answers_count && answers_count < 5) {
     answer = 1;
-  } else if (5 <- answers_count && answers_count < 10) {
+  } else if (5 <= answers_count && answers_count < 10) {
     answer = 2;
-  } else {
+  } else if (10 <= answers_count) {
     answer = 3;
   }
   UMA_HISTOGRAM_COUNTS_100("Brave.P3A.SentAnswersCount", answer);
@@ -34,10 +34,10 @@ void RecordP3A(uint64_t answers_count) {
 
 }  // namespace
 
-BraveP3ALogStore::BraveP3ALogStore(LogSerializer* serializer,
+BraveP3ALogStore::BraveP3ALogStore(Delegate* delegate,
                                    PrefService* local_state)
-    : serializer_(serializer), local_state_(local_state) {
-  DCHECK(serializer_);
+    : delegate_(delegate), local_state_(local_state) {
+  DCHECK(delegate_);
   DCHECK(local_state);
 }
 
@@ -123,7 +123,8 @@ void BraveP3ALogStore::StageNextLog() {
   DCHECK(!log_.find(staged_entry_key_)->second.sent);
 
   uint64_t staged_entry_value = log_[staged_entry_key_].value;
-  staged_log_ = serializer_->Serialize(staged_entry_key_, staged_entry_value);
+  staged_log_ = delegate_->Serialize(staged_entry_key_, staged_entry_value);
+
   VLOG(2) << "BraveP3ALogStore::StageNextLog: staged " << staged_entry_key_;
 }
 
@@ -161,10 +162,17 @@ void BraveP3ALogStore::LoadPersistedUnsentLogs() {
   DCHECK(log_.empty());
   DCHECK(unsent_entries_.empty());
 
-  const base::DictionaryValue* list = local_state_->GetDictionary(kPrefName);
+  DictionaryPrefUpdate update(local_state_, kPrefName);
+  base::DictionaryValue* list = update.Get();
   for (auto dict_item : list->DictItems()) {
     LogEntry entry;
-    std::string name = dict_item.first;
+    const std::string name = dict_item.first;
+    // Check if the metric is obsolete.
+    if (!delegate_->IsActualMetric(name)) {
+      // Drop it from the local state.
+      list->RemoveKey(name);
+      continue;
+    }
     const base::Value& dict = dict_item.second;
     // Value.
     if (const base::Value* v =

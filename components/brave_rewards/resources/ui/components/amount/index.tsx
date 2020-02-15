@@ -15,11 +15,10 @@ export interface Props {
   selected?: boolean
   type?: 'big' | 'small'
   currency?: string
+  onlyAnonWallet?: boolean
 }
 
 export default class Amount extends React.PureComponent<Props, {}> {
-  private selectedAmount: HTMLDivElement | null
-
   static defaultProps = {
     type: 'small',
     currency: 'USD',
@@ -28,25 +27,20 @@ export default class Amount extends React.PureComponent<Props, {}> {
 
   constructor (props: Props) {
     super(props)
-    this.selectedAmount = null
-  }
-
-  componentDidMount () {
-    if (this.selectedAmount) {
-      this.selectedAmount.click()
-    }
-  }
-
-  selectedNodeRef = (node: HTMLDivElement) => {
-    const { selected } = this.props
-
-    if (selected) {
-      this.selectedAmount = node
-    }
   }
 
   getAboutText = (isMobile?: boolean) => {
     return isMobile ? '' : getLocale('about')
+  }
+
+  getBatString = () => {
+    const { onlyAnonWallet, type } = this.props
+
+    if (type !== 'big') {
+      return null
+    }
+
+    return getLocale(onlyAnonWallet ? 'bap' : 'bat')
   }
 
   render () {
@@ -57,10 +51,9 @@ export default class Amount extends React.PureComponent<Props, {}> {
         id={id}
         onClick={onSelect.bind(this, amount)}
         data-test-id={'amount-wrapper'}
-        innerRef={this.selectedNodeRef}
       >
         <StyledAmount selected={selected} type={type}>
-          <StyledLogo><BatColorIcon /></StyledLogo><StyledNumber>{amount}</StyledNumber> <StyledTokens>{type === 'big' ? 'BAT' : null}</StyledTokens>
+          <StyledLogo><BatColorIcon /></StyledLogo><StyledNumber>{amount}</StyledNumber> <StyledTokens>{this.getBatString()}</StyledTokens>
         </StyledAmount>
         <StyledConverted selected={selected} type={type}>
           {getLocale('about')} {converted} {currency}

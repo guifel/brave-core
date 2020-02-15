@@ -24,7 +24,9 @@
 #include "brave/browser/net/resource_context_data.h"
 #include "brave/browser/net/url_context.h"
 #include "mojo/public/cpp/bindings/binding.h"
-#include "mojo/public/cpp/bindings/binding_set.h"
+#include "mojo/public/cpp/bindings/pending_receiver.h"
+#include "mojo/public/cpp/bindings/pending_remote.h"
+#include "mojo/public/cpp/bindings/receiver_set.h"
 #include "net/base/completion_once_callback.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
 #include "services/network/public/cpp/resource_request.h"
@@ -61,8 +63,8 @@ class BraveProxyingURLLoaderFactory
         const network::ResourceRequest& request,
         content::BrowserContext* browser_context,
         const net::MutableNetworkTrafficAnnotationTag& traffic_annotation,
-        network::mojom::URLLoaderRequest loader_request,
-        network::mojom::URLLoaderClientPtr client);
+        mojo::PendingReceiver<network::mojom::URLLoader> loader_receiver,
+        mojo::PendingRemote<network::mojom::URLLoaderClient> client);
     ~InProgressRequest() override;
 
     void Restart();
@@ -123,11 +125,17 @@ class BraveProxyingURLLoaderFactory
 
     content::BrowserContext* browser_context_;
     const net::MutableNetworkTrafficAnnotationTag traffic_annotation_;
-    mojo::Binding<network::mojom::URLLoader> proxied_loader_binding_;
-    network::mojom::URLLoaderClientPtr target_client_;
 
-    mojo::Binding<network::mojom::URLLoaderClient> proxied_client_binding_;
-    network::mojom::URLLoaderPtr target_loader_;
+    // This is our proxy's receiver that will talk to the original client. It
+    // will take over the passed in PendingReceiver.
+    mojo::Receiver<network::mojom::URLLoader> proxied_loader_receiver_;
+    // This is the original client.
+    mojo::Remote<network::mojom::URLLoaderClient> target_client_;
+
+    // This is our proxy's client that will talk to originally targeted loader.
+    mojo::Receiver<network::mojom::URLLoaderClient> proxied_client_receiver_;
+    // This is the original receiver the original client meant to talk to.
+    mojo::Remote<network::mojom::URLLoader> target_loader_;
 
     // NOTE: This is state which ExtensionWebRequestEventRouter needs to have
     // persisted across some phases of this request -- namely between
@@ -168,7 +176,7 @@ class BraveProxyingURLLoaderFactory
       content::BrowserContext* browser_context,
       int render_process_id,
       int frame_tree_node_id,
-      network::mojom::URLLoaderFactoryRequest request,
+      mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
       network::mojom::URLLoaderFactoryPtrInfo target_factory,
       scoped_refptr<RequestIDGenerator> request_id_generator,
       DisconnectCallback on_disconnect);
@@ -183,15 +191,17 @@ class BraveProxyingURLLoaderFactory
           factory_receiver);
 
   // network::mojom::URLLoaderFactory:
-  void CreateLoaderAndStart(network::mojom::URLLoaderRequest loader_request,
-                            int32_t routing_id,
-                            int32_t request_id,
-                            uint32_t options,
-                            const network::ResourceRequest& request,
-                            network::mojom::URLLoaderClientPtr client,
-                            const net::MutableNetworkTrafficAnnotationTag&
-                                traffic_annotation) override;
-  void Clone(network::mojom::URLLoaderFactoryRequest loader_request) override;
+  void CreateLoaderAndStart(
+      mojo::PendingReceiver<network::mojom::URLLoader> loader_receiver,
+      int32_t routing_id,
+      int32_t request_id,
+      uint32_t options,
+      const network::ResourceRequest& request,
+      mojo::PendingRemote<network::mojom::URLLoaderClient> client,
+      const net::MutableNetworkTrafficAnnotationTag& traffic_annotation)
+      override;
+  void Clone(mojo::PendingReceiver<network::mojom::URLLoaderFactory>
+                 loader_receiver) override;
 
  private:
   friend class base::DeleteHelper<BraveProxyingURLLoaderFactory>;
@@ -208,7 +218,7 @@ class BraveProxyingURLLoaderFactory
   const int render_process_id_;
   const int frame_tree_node_id_;
 
-  mojo::BindingSet<network::mojom::URLLoaderFactory> proxy_bindings_;
+  mojo::ReceiverSet<network::mojom::URLLoaderFactory> proxy_receivers_;
   network::mojom::URLLoaderFactoryPtr target_factory_;
 
   std::set<std::unique_ptr<InProgressRequest>, base::UniquePtrComparator>

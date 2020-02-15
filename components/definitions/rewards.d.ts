@@ -16,8 +16,7 @@ declare namespace Rewards {
     NOT_FOUND = 9,
     REGISTRATION_VERIFICATION_FAILED = 10,
     BAD_REGISTRATION_RESPONSE = 11,
-    WALLET_CREATED = 12,
-    GRANT_NOT_FOUND = 13
+    WALLET_CREATED = 12
   }
 
   export type AddressesType = 'BTC' | 'ETH' | 'BAT' | 'LTC'
@@ -26,9 +25,10 @@ declare namespace Rewards {
   export interface State {
     addresses?: Record<AddressesType, Address>
     adsData: AdsData
-    adsHistory: AdsHistoryData[]
+    adsHistory: AdsHistory[]
     autoContributeList: Publisher[]
     balance: Balance
+    balanceReport?: BalanceReport
     contributeLoad: boolean
     contributionMinTime: number
     contributionMinVisits: number
@@ -36,7 +36,6 @@ declare namespace Rewards {
     contributionNonVerified: boolean
     contributionVideos: boolean
     createdTimestamp: number | null
-    currentGrant?: Grant
     donationAbilityTwitter: boolean
     donationAbilityYT: boolean
     enabledAds: boolean
@@ -51,14 +50,14 @@ declare namespace Rewards {
     }
     excludedList: ExcludedPublisher[]
     firstLoad: boolean | null
-    grants?: Grant[]
+    monthlyReport: MonthlyReport
+    promotions?: Promotion[]
     pendingContributions: PendingContribution[]
     pendingContributionTotal: number
     reconcileStamp: number
     recoveryKey: string
     recurringList: Publisher[]
     recurringLoad: boolean
-    reports: Record<string, Report>
     safetyNetFailed?: boolean
     tipsList: Publisher[]
     tipsLoad: boolean
@@ -84,40 +83,81 @@ declare namespace Rewards {
     actions: any
   }
 
-  export type GrantStatus = 'wrongPosition' | 'grantGone' | 'generalError' | 'grantAlreadyClaimed' | number | null
-
-  export interface Grant {
-    promotionId?: string
-    altcurrency?: string
-    probi: string
-    expiryTime: number
-    captcha?: string
-    hint?: string
-    status?: GrantStatus
-    type?: string
+  export interface MonthlyReport {
+    month: number
+    year: number
+    balance?: BalanceReport
+    transactions?: TransactionReport[]
+    contribution?: ContributionReport[]
   }
 
-  export interface GrantResponse {
-    promotionId?: string
-    status?: number
-    type?: string
+  export enum ReportType {
+    GRANT_UGP = 0,
+    AUTO_CONTRIBUTION = 1,
+    DEPOSIT = 2,
+    GRANT_AD = 3,
+    TIP_RECURRING = 4,
+    TIP = 5
+  }
+
+  export interface TransactionReport {
+    amount: number
+    type: ReportType
+    created_at: number
+  }
+
+  export interface ContributionReport {
+    amount: number
+    type: ReportType
+    created_at: number
+    publishers: Publisher[]
+  }
+
+  export type CaptchaStatus = 'start' | 'wrongPosition' | 'generalError' | 'finished' | null
+
+  export enum PromotionTypes {
+    UGP = 0,
+    ADS = 1
+  }
+
+  export enum PromotionStatus {
+    ACTIVE = 0,
+    ATTESTED = 1,
+    CLAIMED = 2,
+    SIGNED_TOKENS = 3,
+    FINISHED = 4,
+    OVER = 5
+  }
+
+  export interface Promotion {
+    promotionId: string
+    amount: number
+    expiresAt: number
+    status: PromotionStatus
+    type: PromotionTypes
+    captchaImage?: string
+    captchaId?: string
+    hint?: string
+    captchaStatus?: CaptchaStatus
+  }
+
+  export interface PromotionResponse {
+    result: number
+    promotions: Promotion[]
   }
 
   export interface WalletProperties {
     choices: number[]
-    grants?: Grant[]
   }
 
   export interface RecoverWallet {
     result: Result
     balance: number
-    grants?: Grant[]
   }
 
-  export interface GrantFinish {
+  export interface PromotionFinish {
     result: Result,
-    statusCode: number,
-    expiryTime: number
+    promotion?: Promotion
   }
 
   export enum ExcludeStatus {
@@ -154,25 +194,24 @@ declare namespace Rewards {
     favIcon: string
   }
 
-  export interface Report {
-    ads: string
-    closing: string
-    contribute: string
-    deposit: string
-    donation: string
-    grant: string
-    tips: string
-    opening: string
-    total: string
+  export interface BalanceReport {
+    ads: number
+    contribute: number
+    donation: number
+    grant: number
+    tips: number
   }
 
   export interface Captcha {
-    image: string
+    result: number
+    promotionId: string
+    captchaImage: string
     hint: string
   }
 
   export interface AdsData {
     adsEnabled: boolean
+    shouldAllowAdConversionTracking: boolean
     adsPerHour: number
     adsUIEnabled: boolean
     adsIsSupported: boolean
@@ -193,6 +232,7 @@ declare namespace Rewards {
   }
 
   export interface PendingContribution {
+    id: number
     publisherKey: string
     percentage: number
     status: PublisherStatus
@@ -242,14 +282,14 @@ declare namespace Rewards {
     args: Record<string, string>
   }
 
-  export interface AdsHistoryData {
+  export interface AdsHistory {
     [key: string]: any
     id: string
     date: string
-    adDetailRows: AdHistoryDetail[]
+    adDetailRows: AdHistory[]
   }
 
-  export interface AdHistoryDetail {
+  export interface AdHistory {
     id: string
     adContent: AdContent
     categoryContent: CategoryContent

@@ -17,6 +17,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/extensions/api/extension_action/extension_action_api.h"
 #include "components/prefs/pref_member.h"
+#include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_registry_observer.h"
 #include "extensions/common/extension.h"
 #include "ui/views/view.h"
@@ -31,7 +32,6 @@ class BraveRewardsBrowserTest;
 
 namespace extensions {
 class ExtensionActionManager;
-class ExtensionRegistry;
 }
 
 namespace views {
@@ -109,6 +109,9 @@ class BraveActionsContainer : public views::View,
  private:
   friend class ::BraveActionsContainerTest;
   friend class ::BraveRewardsBrowserTest;
+
+  class EmptyExtensionsContainer;
+
   // Special positions in the container designators
   enum ActionPosition : int {
     ACTION_ANY_POSITION = -1,
@@ -181,6 +184,8 @@ class BraveActionsContainer : public views::View,
   // Listen for Brave Rewards preferences changes.
   BooleanPrefMember brave_rewards_enabled_;
   BooleanPrefMember hide_brave_rewards_button_;
+
+  std::unique_ptr<EmptyExtensionsContainer> empty_extensions_container_;
 
   base::WeakPtrFactory<BraveActionsContainer> weak_ptr_factory_;
 

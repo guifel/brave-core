@@ -1,0 +1,13 @@
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/AppHooks.java b/chrome/android/java/src/org/chromium/chrome/browser/AppHooks.java
+index f5e474368e4ccbb13046aaafd4586eb39c67a639..218cd7edd765be4c3ae66dc1c131bc08f664ccb6 100644
+--- a/chrome/android/java/src/org/chromium/chrome/browser/AppHooks.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/AppHooks.java
+@@ -85,7 +85,7 @@ public abstract class AppHooks {
+ 
+     @CalledByNative
+     public static AppHooks get() {
+-        if (sInstance == null) sInstance = new AppHooksImpl();
++        if (sInstance == null) sInstance = new BraveAppHooks();
+         return sInstance;
+     }
+ 

@@ -7,6 +7,7 @@ import { BlockTypes, BlockOptions, BlockFPOptions, BlockJSOptions, BlockCookiesO
 
 export interface ShieldDetails {
   id: number
+  cosmeticBlocking: boolean
   ads: BlockOptions
   trackers: BlockOptions
   httpUpgradableResources: BlockOptions
@@ -39,6 +40,14 @@ interface ShieldsToggledReturn {
 
 export interface ShieldsToggled {
   (setting: BlockOptions): ShieldsToggledReturn
+}
+
+interface ReportBrokenSiteReturn {
+  type: types.REPORT_BROKEN_SITE
+}
+
+export interface ReportBrokenSite {
+  (): ReportBrokenSiteReturn
 }
 
 interface ResourceBlockedReturn {
@@ -164,9 +173,42 @@ export interface ShieldsReady {
   (): ShieldsReadyReturn
 }
 
+interface GenerateClassIdStylesheetReturn {
+  type: types.GENERATE_CLASS_ID_STYLESHEET,
+  tabId: number,
+  classes: string[],
+  ids: string[]
+}
+
+export interface GenerateClassIdStylesheet {
+  (tabId: number, classes: string[], ids: string[]): GenerateClassIdStylesheetReturn
+}
+
+interface CosmeticFilterRuleExceptionsReturn {
+  type: types.COSMETIC_FILTER_RULE_EXCEPTIONS,
+  tabId: number,
+  exceptions: string[],
+  randomizedClassName: string
+}
+
+export interface CosmeticFilterRuleExceptions {
+  (tabId: number, exceptions: string[], randomizedClassName: string): CosmeticFilterRuleExceptionsReturn
+}
+
+interface ContentScriptsLoadedReturn {
+  type: types.CONTENT_SCRIPTS_LOADED,
+  tabId: number,
+  url: string,
+}
+
+export interface ContentScriptsLoaded {
+  (tabId: number, url: string): ContentScriptsLoadedReturn
+}
+
 export type shieldPanelActions =
   ShieldsPanelDataUpdatedReturn |
   ShieldsToggledReturn |
+  ReportBrokenSiteReturn |
   ResourceBlockedReturn |
   BlockAdsTrackersReturn |
   ControlsToggledReturn |
@@ -180,4 +222,7 @@ export type shieldPanelActions =
   SetAllScriptsBlockedCurrentStateReturn |
   SetFinalScriptsBlockedStateReturn |
   SetAdvancedViewFirstAccessReturn |
-  ShieldsReadyReturn
+  ShieldsReadyReturn |
+  GenerateClassIdStylesheetReturn |
+  CosmeticFilterRuleExceptionsReturn |
+  ContentScriptsLoadedReturn

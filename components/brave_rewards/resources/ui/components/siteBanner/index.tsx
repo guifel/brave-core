@@ -80,6 +80,9 @@ export interface Props {
   tipComplete?: boolean
   onTweet: () => void
   nextContribution?: string
+  onlyAnonWallet?: boolean
+  monthlyDate?: string
+  amount?: string
 }
 
 export default class SiteBanner extends React.PureComponent<Props, {}> {
@@ -192,24 +195,34 @@ export default class SiteBanner extends React.PureComponent<Props, {}> {
   }
 
   getText (children?: React.ReactNode) {
-    if (!children) {
-      const bannerText = this.props.type === 'one-time'
-        ? 'rewardsBanner'
-        : 'rewardsBannerMonthly'
+    if (children) {
+      return children
+    }
 
+    if (this.props.type === 'one-time') {
       return (
         <>
           <p>
-            {getLocale(`${bannerText}Text1`)}
+            {getLocale(`rewardsBannerText1`)}
           </p>
           <p>
-            {getLocale(`${bannerText}Text2`)}
+            {getLocale(`rewardsBannerText2`)}
           </p>
         </>
       )
     }
 
-    return children
+    if (this.props.type === 'monthly') {
+      return (
+        <>
+          <p>
+            {getLocale(`rewardsBannerMonthlyText1`)}
+          </p>
+        </>
+      )
+    }
+
+    return null
   }
 
   onDonate = (amount: string) => {
@@ -227,12 +240,15 @@ export default class SiteBanner extends React.PureComponent<Props, {}> {
   }
 
   renderConfirmation = () => {
-    const { type, onTweet } = this.props
+    const { type, onTweet, onlyAnonWallet, monthlyDate, amount } = this.props
 
     return (
       <DonateConfirmation
         onTweet={onTweet}
+        onlyAnonWallet={onlyAnonWallet}
         isMonthly={type === 'monthly'}
+        monthlyDate={monthlyDate}
+        amount={amount}
       />
     )
   }
@@ -261,11 +277,13 @@ export default class SiteBanner extends React.PureComponent<Props, {}> {
       isVerified,
       type,
       nextContribution,
-      tipComplete
+      tipComplete,
+      onlyAnonWallet
     } = this.props
 
     const isMonthly = type === 'monthly'
     const isTwitterTip: boolean = !!(screenName && screenName !== '')
+    const batFormatString = onlyAnonWallet ? 'bap' : 'bat'
 
     return (
       <StyledWrapper
@@ -330,7 +348,7 @@ export default class SiteBanner extends React.PureComponent<Props, {}> {
             </StyledContent>
             <StyledDonation monthly={isMonthly}>
               <StyledWallet monthly={isMonthly}>
-                {getLocale('walletBalance')} <StyledTokens>{balance} BAT</StyledTokens>
+                {getLocale('walletBalance')} <StyledTokens>{balance} {getLocale(batFormatString)}</StyledTokens>
               </StyledWallet>
               {
                 tipComplete
@@ -347,6 +365,7 @@ export default class SiteBanner extends React.PureComponent<Props, {}> {
                     donateType={'big'}
                     currentAmount={currentAmount}
                     addFundsLink={addFundsLink}
+                    onlyAnonWallet={onlyAnonWallet}
                 />
               }
             </StyledDonation>

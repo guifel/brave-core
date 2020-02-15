@@ -63,6 +63,7 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "314e7529efec41c8867019815f4d8dad.svg", IDR_BRAVE_NEW_TAB_IMG4 },
         { "6c337c63662ee0ba4e57f6f8156d69ce.svg", IDR_BRAVE_NEW_TAB_IMG2 },
         // New tab Backgrounds
+#if !defined(OS_ANDROID)
         { "ntp-1.webp", IDR_BRAVE_NEW_TAB_BACKGROUND1 },
         { "ntp-2.webp", IDR_BRAVE_NEW_TAB_BACKGROUND2 },
         { "ntp-3.webp", IDR_BRAVE_NEW_TAB_BACKGROUND3 },
@@ -79,7 +80,15 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "ntp-14.webp", IDR_BRAVE_NEW_TAB_BACKGROUND14 },
         { "ntp-15.webp", IDR_BRAVE_NEW_TAB_BACKGROUND15 },
         { "ntp-16.webp", IDR_BRAVE_NEW_TAB_BACKGROUND16 },
-
+        { "ntp-dummy-brandedwallpaper/wallpaper-0.jpg",
+            IDR_BRAVE_NEW_TAB_DUMMY_BRANDED_WALLPAPER_BG_1 },
+        { "ntp-dummy-brandedwallpaper/wallpaper-1.jpg",
+            IDR_BRAVE_NEW_TAB_DUMMY_BRANDED_WALLPAPER_BG_2 },
+        { "ntp-dummy-brandedwallpaper/wallpaper-2.jpg",
+            IDR_BRAVE_NEW_TAB_DUMMY_BRANDED_WALLPAPER_BG_3 },
+        { "ntp-dummy-brandedwallpaper/logo.png",
+            IDR_BRAVE_NEW_TAB_DUMMY_BRANDED_WALLPAPER_LOGO },
+#endif
         // private tab
         { "c168145d6bf1abf2c0322636366f7dbe.svg", IDR_BRAVE_PRIVATE_TAB_TOR_IMG },               // NOLINT
         { "dbdc336ccc651b8a7c925b3482d6e65a.svg", IDR_BRAVE_PRIVATE_TAB_IMG }
@@ -133,6 +142,8 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "adsTrackersBlocked", IDS_BRAVE_NEW_TAB_TOTAL_ADS_TRACKERS_BLOCKED },
         { "httpsUpgraded", IDS_BRAVE_NEW_TAB_TOTAL_HTTPS_UPGRADES },
         { "estimatedTimeSaved", IDS_BRAVE_NEW_TAB_TOTAL_TIME_SAVED },
+        { "estimatedBandwidthSaved",
+            IDS_BRAVE_NEW_TAB_ESTIMATED_BANDWIDTH_SAVED },
         { "thumbRemoved", IDS_BRAVE_NEW_TAB_THUMB_REMOVED },
         { "undoRemoved", IDS_BRAVE_NEW_TAB_UNDO_REMOVED },
         { "close", IDS_BRAVE_NEW_TAB_CLOSE },
@@ -145,7 +156,12 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "hours", IDS_BRAVE_NEW_TAB_HOURS },
         { "day", IDS_BRAVE_NEW_TAB_DAY },
         { "days", IDS_BRAVE_NEW_TAB_DAYS },
+        { "B", IDS_BRAVE_NEW_TAB_BYTES },
+        { "KB", IDS_BRAVE_NEW_TAB_KILOBYTES },
+        { "MB", IDS_BRAVE_NEW_TAB_MEGABYTES },
+        { "GB", IDS_BRAVE_NEW_TAB_GIGABYTES },
         { "photoBy", IDS_BRAVE_NEW_TAB_PHOTO_BY },
+        { "hide", IDS_BRAVE_NEW_TAB_HIDE },
         { "preferencesPageTitle", IDS_BRAVE_NEW_TAB_PREFERENCES_PAGE_TITLE },
         { "bookmarksPageTitle", IDS_BRAVE_NEW_TAB_BOOKMARKS_PAGE_TITLE },
         { "historyPageTitle", IDS_BRAVE_NEW_TAB_HISTORY_PAGE_TITLE },
@@ -156,7 +172,7 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "showClock", IDS_BRAVE_NEW_TAB_SHOW_CLOCK },
         { "showTopSites", IDS_BRAVE_NEW_TAB_SHOW_TOP_SITES },
         { "showRewards", IDS_BRAVE_NEW_TAB_SHOW_REWARDS },
-
+        { "brandedWallpaperOptIn", IDS_BRAVE_NEW_TAB_BRANDED_WALLPAPER_OPT_IN },
         // Private Tab - General
         { "learnMore", IDS_BRAVE_PRIVATE_NEW_TAB_LEARN_MORE },
         { "done", IDS_BRAVE_PRIVATE_NEW_TAB_DONE },
@@ -193,29 +209,33 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "boxTorButton", IDS_BRAVE_PRIVATE_NEW_TAB_BOX_TOR_BUTTON },
 
         // Rewards widget
-        { "rewardsWidgetAnd", IDS_BRAVE_UI_AND },
+        { "rewardsWidgetBap", IDS_BRAVE_UI_BAP_REWARDS_TEXT },
         { "rewardsWidgetBat", IDS_BRAVE_UI_BAT_REWARDS_TEXT },
-        { "rewardsWidgetBatPoints", IDS_BRAVE_UI_BAT_POINTS_TEXT },
         { "rewardsWidgetBraveRewards", IDS_BRAVE_UI_BRAVE_REWARDS },
-        { "rewardsWidgetPrivacyPolicy", IDS_BRAVE_UI_PRIVACY_POLICY },
-        { "rewardsWidgetTermsOfService", IDS_BRAVE_UI_TERMS_OF_SERVICE },
         { "rewardsWidgetTurnOnAds", IDS_BRAVE_UI_TURN_ON_ADS },
         { "rewardsWidgetClaimMyRewards", IDS_REWARDS_WIDGET_CLAIM_MY_REWARDS },
         { "rewardsWidgetWalletFailedButton", IDS_BRAVE_UI_WALLET_FAILED_BUTTON },         // NOLINT
         { "rewardsWidgetAboutRewards", IDS_REWARDS_WIDGET_ABOUT_REWARDS },
         { "rewardsWidgetServiceText", IDS_REWARDS_WIDGET_SERVICE_TEXT },
         { "rewardsWidgetEstimatedEarnings", IDS_REWARDS_WIDGET_ESTIMATED_EARNINGS },      // NOLINT
+        { "rewardsWidgetAdsOptInDescription", IDS_REWARDS_WIDGET_ADS_OPT_IN_DESCRIPTION },      // NOLINT
         { "rewardsWidgetMonthlyTips", IDS_REWARDS_WIDGET_MONTHLY_TIPS },
         { "rewardsWidgetTurningOn", IDS_REWARDS_WIDGET_TURNING_ON },
         { "rewardsWidgetTurnOnRewards", IDS_REWARDS_WIDGET_TURN_ON_REWARDS },             // NOLINT
         { "rewardsWidgetReEnableTitle", IDS_REWARDS_WIDGET_REENABLE_TITLE },              // NOLINT
+        { "rewardsWidgetTurnOnLearnMore", IDS_REWARDS_WIDGET_TURN_ON_LEARN_MORE },        // NOLINT
         { "rewardsWidgetEnableTitle", IDS_REWARDS_WIDGET_ENABLE_TITLE },
+        { "rewardsWidgetEnableBrandedWallpaperTitle", IDS_REWARDS_WIDGET_ENABLE_BRANDED_WALLPAPER_TITLE },  // NOLINT
         { "rewardsWidgetReEnableSubTitle", IDS_REWARDS_WIDGET_REENABLE_SUBTITLE },        // NOLINT
         { "rewardsWidgetEnableSubTitle", IDS_REWARDS_WIDGET_ENABLE_SUBTITLE },            // NOLINT
+        { "rewardsWidgetEnableBrandedWallpaperSubTitle", IDS_REWARDS_WIDGET_ENABLE_BRANDED_WALLPAPER_SUBTITLE },            // NOLINT
         { "rewardsWidgetAdsNotSupported", IDS_BRAVE_REWARDS_LOCAL_ADS_NOT_SUPPORTED_REGION },    // NOLINT
         { "rewardsWidgetNotificationTitle", IDS_REWARDS_WIDGET_NOTIFICATION_TITLE },      // NOLINT
         { "rewardsWidgetNotificationTextAds", IDS_REWARDS_WIDGET_NOTIFICATION_TEXT_ADS }, // NOLINT
-        { "rewardsWidgetNotificationTextUGP", IDS_REWARDS_WIDGET_NOTIFICATION_TEXT_UGP }  // NOLINT
+        { "rewardsWidgetNotificationTextUGP", IDS_REWARDS_WIDGET_NOTIFICATION_TEXT_UGP },  // NOLINT
+        { "rewardsWidgetBrandedNotificationTitle", IDS_REWARDS_WIDGET_BRANDED_NOTIFICATION_TITLE },      // NOLINT
+        { "rewardsWidgetBrandedNotificationDescription", IDS_REWARDS_WIDGET_BRANDED_NOTIFICATION_DESCRIPTION }, // NOLINT
+        { "rewardsWidgetBrandedNotificationHideAction", IDS_REWARDS_WIDGET_BRANDED_NOTIFICATION_HIDE_ACTION }, // NOLINT
       }
     }, {
       std::string("welcome"), {
@@ -238,13 +258,6 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "chooseSearchEngine", IDS_BRAVE_WELCOME_PAGE_SEARCH_DESC },
         { "selectSearchEngine", IDS_BRAVE_WELCOME_PAGE_SEARCH_SELECT },
         { "privateExperience", IDS_BRAVE_WELCOME_PAGE_PRIVATE_EXPERIENCE_DESC },
-        { "findToolbarTheme", IDS_BRAVE_WELCOME_PAGE_THEME_TITLE },
-        { "chooseTheme", IDS_BRAVE_WELCOME_PAGE_THEME_DESC },
-        { "selectTheme", IDS_BRAVE_WELCOME_PAGE_SELECT_THEME_DESC },
-        { "confirmTheme", IDS_BRAVE_WELCOME_PAGE_CONFIRM_THEME_BUTTON },
-        { "light", IDS_BRAVE_WELCOME_PAGE_LIGHT_THEME_DESC },
-        { "dark", IDS_BRAVE_WELCOME_PAGE_DARK_THEME_DESC },
-        { "systemTheme", IDS_BRAVE_WELCOME_PAGE_SYSTEM_THEME_DESC },
         { "skipWelcomeTour", IDS_BRAVE_WELCOME_PAGE_SKIP_BUTTON },
         { "next", IDS_BRAVE_WELCOME_PAGE_NEXT_BUTTON },
         { "done", IDS_BRAVE_WELCOME_PAGE_DONE_BUTTON },
@@ -252,6 +265,8 @@ void CustomizeWebUIHTMLSource(const std::string &name,
       }
     }, {
       std::string("rewards"), {
+        { "adsAllowConversionTracking",  IDS_BRAVE_REWARDS_LOCAL_ADS_ALLOW_CONVERSION_TRACKING },  // NOLINT
+        { "adsAllowConversionTrackingDescription",  IDS_BRAVE_REWARDS_LOCAL_ADS_ALLOW_CONVERSION_TRACKING_DESCRIPTION },  // NOLINT
         { "adsCurrentEarnings",  IDS_BRAVE_REWARDS_LOCAL_ADS_CURRENT_EARNINGS },
         { "adsDesc",  IDS_BRAVE_REWARDS_LOCAL_ADS_DESC },
         { "adsDisabledTextOne",  IDS_BRAVE_REWARDS_LOCAL_ADS_DISABLED_TEXT_ONE },                // NOLINT
@@ -261,6 +276,7 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "adsNotSupportedDevice", IDS_BRAVE_REWARDS_LOCAL_ADS_NOT_SUPPORTED_DEVICE },           // NOLINT
         { "adsPaymentDate",  IDS_BRAVE_REWARDS_LOCAL_ADS_PAYMENT_DATE },
         { "adsPagesViewed",  IDS_BRAVE_REWARDS_LOCAL_ADS_PAGES_VIEWED },
+        { "adsOtherSettings",  IDS_BRAVE_REWARDS_LOCAL_ADS_OTHER_SETTINGS },
         { "adsPerHour",  IDS_BRAVE_REWARDS_LOCAL_ADS_PER_HOUR },
         { "adsPerHour1",  IDS_BRAVE_REWARDS_LOCAL_ADS_PER_HOUR_1 },
         { "adsPerHour2",  IDS_BRAVE_REWARDS_LOCAL_ADS_PER_HOUR_2 },
@@ -270,6 +286,7 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "adsTitle",  IDS_BRAVE_REWARDS_LOCAL_ADS_TITLE },
 
         { "bat", IDS_BRAVE_UI_BAT_REWARDS_TEXT },
+        { "bap", IDS_BRAVE_UI_BAP_REWARDS_TEXT },
         { "batPoints", IDS_BRAVE_UI_BAT_POINTS_TEXT },
         { "batPointsMessage", IDS_BRAVE_UI_POINTS_MESSAGE },
         { "contributionTitle",  IDS_BRAVE_REWARDS_LOCAL_CONTR_TITLE },
@@ -323,15 +340,11 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "proveHuman",  IDS_BRAVE_REWARDS_LOCAL_PROVE_HUMAN },
         { "serverNotResponding",  IDS_BRAVE_REWARDS_LOCAL_SERVER_NOT_RESPONDING },               // NOLINT
         { "uhOh",  IDS_BRAVE_REWARDS_LOCAL_UH_OH },
-        { "grantGoneTitle",  IDS_BRAVE_REWARDS_LOCAL_GRANT_GONE_TITLE },
-        { "grantGoneButton",  IDS_BRAVE_REWARDS_LOCAL_GRANT_GONE_BUTTON },
-        { "grantGoneText",  IDS_BRAVE_REWARDS_LOCAL_GRANT_GONE_TEXT },
         { "grantGeneralErrorTitle",  IDS_BRAVE_REWARDS_LOCAL_GENERAL_GRANT_ERROR_TITLE },        // NOLINT
         { "grantGeneralErrorButton",  IDS_BRAVE_REWARDS_LOCAL_GENERAL_GRANT_ERROR_BUTTON },      // NOLINT
         { "grantGeneralErrorText",  IDS_BRAVE_REWARDS_LOCAL_GENERAL_GRANT_ERROR_TEXT },          // NOLINT
         { "walletCorrupted",  IDS_BRAVE_REWARDS_LOCAL_WALLET_CORRUPTED },
         { "walletCorruptedNow",  IDS_BRAVE_REWARDS_LOCAL_WALLET_CORRUPTED_NOW },
-        { "grantAlreadyClaimedText", IDS_BRAVE_REWARDS_LOCAL_GRANT_ALREADY_CLAIMED_TEXT },       // NOLINT
         { "redirectModalError", IDS_BRAVE_REWARDS_LOCAL_REDIRECT_MODAL_ERROR },
         { "redirectModalClose", IDS_BRAVE_REWARDS_LOCAL_REDIRECT_MODAL_CLOSE },
         { "redirectModalErrorWallet", IDS_BRAVE_REWARDS_LOCAL_REDIRECT_MODAL_ERROR_WALLET },     // NOLINT
@@ -425,6 +438,7 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "grantFinishTitleUGP", IDS_BRAVE_UI_GRANT_FINISH_TITLE_UGP },
         { "grantFinishTokenAds", IDS_BRAVE_UI_GRANT_FINISH_TOKEN_ADS },
         { "grantFinishTokenUGP", IDS_BRAVE_UI_GRANT_FINISH_TOKEN_UGP },
+        { "grantFinishPointUGP", IDS_BRAVE_UI_GRANT_FINISH_POINT_UGP },
         { "grants", IDS_BRAVE_UI_GRANTS },
         { "import", IDS_BRAVE_UI_IMPORT },
         { "includeInAuto", IDS_BRAVE_UI_INCLUDE_IN_AUTO },
@@ -452,6 +466,7 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "noAdsHistory", IDS_BRAVE_UI_ADS_NO_ADS_HISTORY },
         { "noGrants", IDS_BRAVE_UI_NO_GRANTS },
         { "notEnoughTokens", IDS_BRAVE_UI_NOT_ENOUGH_TOKENS },
+        { "notEnoughTokensLink", IDS_BRAVE_UI_NOT_ENOUGH_TOKENS_LINK },
         { "noThankYou", IDS_BRAVE_UI_NO_THANK_YOU },
         { "off", IDS_BRAVE_UI_OFF },
         { "ok", IDS_BRAVE_UI_OK },
@@ -479,6 +494,9 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "pinnedSitesThree", IDS_BRAVE_UI_PAYMENT_PINNED_SITES_THREE },
         { "pinnedSitesFour", IDS_BRAVE_UI_PAYMENT_PINNED_SITES_FOUR },
         { "pleaseNote", IDS_BRAVE_UI_PLEASE_NOTE },
+        { "point", IDS_BRAVE_UI_POINT },
+        { "pointGrantClaimed", IDS_BRAVE_UI_POINT_GRANT_CLAIMED },
+        { "points", IDS_BRAVE_UI_POINTS },
         { "print", IDS_BRAVE_UI_PRINT },
         { "processingRequest", IDS_BRAVE_UI_PROCESSING_REQUEST },
         { "processingRequestButton", IDS_BRAVE_UI_PROCESSING_REQUEST_BUTTON },
@@ -544,7 +562,10 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "titleETH", IDS_BRAVE_UI_TITLE_ETH},
         { "titleLTC", IDS_BRAVE_UI_TITLE_LTC},
         { "tokenGrantClaimed", IDS_BRAVE_UI_TOKEN_GRANT_CLAIMED },
+        { "token", IDS_BRAVE_UI_TOKEN },
         { "tokens", IDS_BRAVE_UI_TOKENS },
+        { "tokenGrants", IDS_BRAVE_UI_TOKEN_GRANTS },
+        { "pointGrants", IDS_BRAVE_UI_POINT_GRANTS },
         { "total", IDS_BRAVE_UI_TOTAL },
         { "transactions", IDS_BRAVE_UI_TRANSACTIONS },
         { "turnOnAds", IDS_BRAVE_UI_TURN_ON_ADS },
@@ -573,7 +594,6 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "walletVerificationNote1", IDS_BRAVE_UI_WALLET_VERIFICATION_NOTE1 },
         { "walletVerificationNote2", IDS_BRAVE_UI_WALLET_VERIFICATION_NOTE2 },
         { "walletVerificationTitle1", IDS_BRAVE_UI_WALLET_VERIFICATION_TITLE1 },
-        { "walletVerificationTitle2", IDS_BRAVE_UI_WALLET_VERIFICATION_TITLE2 },
         { "walletVerified", IDS_BRAVE_UI_WALLET_VERIFIED },
 
         { "walletFailedButton", IDS_BRAVE_UI_WALLET_FAILED_BUTTON },
@@ -584,6 +604,7 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "welcomeButtonTextTwo", IDS_BRAVE_UI_WELCOME_BUTTON_TEXT_TWO},
         { "welcomeDescOne", IDS_BRAVE_UI_WELCOME_DESC_ONE},
         { "welcomeDescTwo", IDS_BRAVE_UI_WELCOME_DESC_TWO},
+        { "welcomeDescPoints", IDS_BRAVE_UI_WELCOME_DESC_POINTS },
         { "welcomeFooterTextOne", IDS_BRAVE_UI_WELCOME_FOOTER_TEXT_ONE},
         { "welcomeFooterTextTwo", IDS_BRAVE_UI_WELCOME_FOOTER_TEXT_TWO},
         { "welcomeHeaderOne", IDS_BRAVE_UI_WELCOME_HEADER_ONE},
@@ -697,23 +718,28 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "addFunds", IDS_BRAVE_UI_ADD_FUNDS },
         { "autoTipText", IDS_BRAVE_UI_AUTO_TIP_TEXT },
         { "bat", IDS_BRAVE_UI_BAT_TEXT },
+        { "bap", IDS_BRAVE_UI_BAP_REWARDS_TEXT },
+        { "contributionAmount", IDS_BRAVE_UI_CONTRIBUTION_AMOUNT },
+        { "contributionNextDate",  IDS_BRAVE_REWARDS_LOCAL_CONTR_NEXT_DATE },
         { "donationAmount", IDS_BRAVE_UI_DONATION_AMOUNT },
         { "doMonthly", IDS_BRAVE_UI_DO_MONTHLY },
         { "firstTipDateText", IDS_BRAVE_UI_FIRST_TIP_TEXT },
         { "makeMonthly", IDS_BRAVE_UI_MAKE_MONTHLY },
         { "notEnoughTokens", IDS_BRAVE_UI_NOT_ENOUGH_TOKENS },
+        { "notEnoughTokensLink", IDS_BRAVE_UI_NOT_ENOUGH_TOKENS_LINK },
         { "on", IDS_BRAVE_UI_ON },
         { "monthlyText", IDS_BRAVE_UI_MONTHLY_TEXT },
+        { "monthlySet", IDS_BRAVE_UI_CONTRIBUTION_SET },
         { "redditTipTitle", IDS_BRAVE_UI_REDDIT_TIP_TITLE },
         { "redditTipTitleEmpty", IDS_BRAVE_UI_REDDIT_TIP_TITLE_EMPTY },
         { "githubTipTitle", IDS_BRAVE_UI_GITHUB_TIP_TITLE },
         { "githubTipTitleEmpty", IDS_BRAVE_UI_GITHUB_TIP_TITLE_EMPTY },
         { "monthlyContribution", IDS_BRAVE_UI_MONTHLY_CONTRIBUTION },
         { "nextContribution", IDS_BRAVE_UI_NEXT_CONTRIBUTION },
+        { "points", IDS_BRAVE_UI_POINTS },
         { "rewardsBannerText1", IDS_BRAVE_UI_REWARDS_BANNER_TEXT1 },
         { "rewardsBannerText2", IDS_BRAVE_UI_REWARDS_BANNER_TEXT2 },
-        { "rewardsBannerMonthlyText1", IDS_BRAVE_UI_REWARDS_BANNER_TEXT1 },
-        { "rewardsBannerMonthlyText2", IDS_BRAVE_UI_REWARDS_BANNER_TEXT2 },
+        { "rewardsBannerMonthlyText1", IDS_BRAVE_UI_REWARDS_BANNER_MONTHLY_TEXT1 },              // NOLINT
         { "sendDonation", IDS_BRAVE_UI_SEND_DONATION },
         { "setContribution", IDS_BRAVE_UI_SET_CONTRIBUTION },
         { "shareText", IDS_BRAVE_UI_SHARE_TEXT },
@@ -759,6 +785,19 @@ void CustomizeWebUIHTMLSource(const std::string &name,
         { "valid", IDS_BRAVE_REWARDS_INTERNALS_VALID },
         { "viewingId", IDS_BRAVE_REWARDS_INTERNALS_VIEWING_ID },
         { "walletPaymentId", IDS_BRAVE_REWARDS_INTERNALS_WALLET_PAYMENT_ID },
+      }
+    }, {
+      std::string("webcompat"), {
+        // Report modal
+        { "reportModalTitle", IDS_BRAVE_WEBCOMPATREPORTER_REPORT_MODAL_TITLE },
+        { "reportExplanation", IDS_BRAVE_WEBCOMPATREPORTER_REPORT_EXPLANATION },
+        { "reportDisclaimer", IDS_BRAVE_WEBCOMPATREPORTER_REPORT_DISCLAIMER },
+        { "cancel", IDS_BRAVE_WEBCOMPATREPORTER_CANCEL },
+        { "submit", IDS_BRAVE_WEBCOMPATREPORTER_SUBMIT },
+        // Confirmation modal
+        { "thankYou", IDS_BRAVE_WEBCOMPATREPORTER_THANK_YOU },
+        { "confirmationNotice",
+            IDS_BRAVE_WEBCOMPATREPORTER_CONFIRMATION_NOTICE },
       }
     }
   };

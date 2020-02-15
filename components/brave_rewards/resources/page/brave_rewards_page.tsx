@@ -11,14 +11,14 @@ require('emptykit.css')
 
 // Components
 import App from './components/app'
-require('../../../fonts/muli.css')
-require('../../../fonts/poppins.css')
+require('../../../../ui/webui/resources/fonts/muli.css')
+require('../../../../ui/webui/resources/fonts/poppins.css')
 
 // Utils
 import store from './store'
 import { ThemeProvider } from 'brave-ui/theme'
 import Theme from 'brave-ui/theme/brave-default'
-import { getActions as getUtilActions, setActions } from './utils'
+import { getActions as getUtilActions, setActions, getCurrentBalanceReport } from './utils'
 import * as rewardsActions from './actions/rewards_actions'
 
 window.cr.define('brave_rewards', function () {
@@ -61,12 +61,12 @@ window.cr.define('brave_rewards', function () {
     getActions().onWalletProperties(properties)
   }
 
-  function grant (properties: Rewards.GrantResponse) {
-    getActions().onGrant(properties)
+  function promotions (properties: Rewards.PromotionResponse) {
+    getActions().onPromotions(properties)
   }
 
-  function grantCaptcha (captcha: Rewards.Captcha) {
-    getActions().onGrantCaptcha(captcha)
+  function claimPromotion (properties: Rewards.Captcha) {
+    getActions().onClaimPromotion(properties)
   }
 
   function walletPassphrase (pass: string) {
@@ -77,8 +77,8 @@ window.cr.define('brave_rewards', function () {
     getActions().onRecoverWalletData(properties)
   }
 
-  function grantFinish (properties: Rewards.GrantFinish) {
-    getActions().onGrantFinish(properties)
+  function promotionFinish (properties: Rewards.PromotionFinish) {
+    getActions().onPromotionFinish(properties)
   }
 
   function reconcileStamp (stamp: number) {
@@ -93,8 +93,8 @@ window.cr.define('brave_rewards', function () {
     getActions().onExcludedList(list)
   }
 
-  function balanceReports (reports: Record<string, Rewards.Report>) {
-    getActions().onBalanceReports(reports)
+  function balanceReport (properties: {month: number, year: number, report: Rewards.BalanceReport}) {
+    getActions().onBalanceReport(properties)
   }
 
   function walletExists (exists: boolean) {
@@ -125,7 +125,7 @@ window.cr.define('brave_rewards', function () {
     getActions().onAdsData(adsData)
   }
 
-  function adsHistory (adsHistory: Rewards.AdsHistoryData[]) {
+  function adsHistory (adsHistory: Rewards.AdsHistory[]) {
     getActions().onAdsHistory(adsHistory)
   }
 
@@ -179,10 +179,6 @@ window.cr.define('brave_rewards', function () {
     getActions().onRecurringTipRemoved(success)
   }
 
-  function onContributionSaved (properties: Rewards.ContributionSaved) {
-    getActions().onContributionSaved(properties)
-  }
-
   function pendingContributions (list: Rewards.PendingContribution[]) {
     getActions().onPendingContributions(list)
   }
@@ -207,6 +203,11 @@ window.cr.define('brave_rewards', function () {
     getActions().getContributeList()
     getActions().getBalance()
     getActions().getWalletProperties()
+    getCurrentBalanceReport()
+
+    if (properties.type === 8) { // Rewards.RewardsType.ONE_TIME_TIP
+      chrome.send('brave_rewards.getOneTimeTips')
+    }
 
     // EXPIRED TOKEN
     if (properties.result === 24) {
@@ -233,20 +234,32 @@ window.cr.define('brave_rewards', function () {
     getActions().onOnlyAnonWallet(only)
   }
 
+  function unblindedTokensReady () {
+    getActions().getBalance()
+  }
+
+  function monthlyReport (properties: { result: number, month: number, year: number, report: Rewards.MonthlyReport}) {
+    getActions().onMonthlyReport(properties)
+  }
+
+  function reconcileStampReset () {
+    getActions().onReconcileStampReset()
+  }
+
   return {
     initialize,
     walletCreated,
     walletCreateFailed,
     walletProperties,
-    grant,
-    grantCaptcha,
+    promotions,
+    claimPromotion,
     walletPassphrase,
     recoverWalletData,
-    grantFinish,
+    promotionFinish,
     reconcileStamp,
     contributeList,
     excludedList,
-    balanceReports,
+    balanceReport,
     walletExists,
     contributionAmount,
     recurringTips,
@@ -268,7 +281,6 @@ window.cr.define('brave_rewards', function () {
     transactionHistoryChanged,
     recurringTipSaved,
     recurringTipRemoved,
-    onContributionSaved,
     onRemovePendingContribution,
     excludedSiteChanged,
     balance,
@@ -276,7 +288,10 @@ window.cr.define('brave_rewards', function () {
     externalWallet,
     processRewardsPageUrl,
     disconnectWallet,
-    onlyAnonWallet
+    onlyAnonWallet,
+    unblindedTokensReady,
+    monthlyReport,
+    reconcileStampReset
   }
 })
 

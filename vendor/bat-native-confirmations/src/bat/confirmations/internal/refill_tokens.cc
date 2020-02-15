@@ -53,11 +53,18 @@ void RefillTokens::Refill(
 
   public_key_ = public_key;
 
+  nonce_ = "";
+
   RequestSignedTokens();
 }
 
 void RefillTokens::RetryGettingSignedTokens() {
   BLOG(INFO) << "Retry getting signed tokens";
+
+  if (nonce_.empty()) {
+    RequestSignedTokens();
+    return;
+  }
 
   GetSignedTokens();
 }
@@ -133,7 +140,7 @@ void RefillTokens::OnRequestSignedTokens(
   base::Optional<base::Value> dictionary = base::JSONReader::Read(response);
   if (!dictionary || !dictionary->is_dict()) {
     BLOG(ERROR) << "Failed to parse response: " << response;
-    OnRefill(FAILED);
+    OnRefill(FAILED, false);
     return;
   }
 
@@ -141,7 +148,7 @@ void RefillTokens::OnRequestSignedTokens(
   auto* nonce_value = dictionary->FindKey("nonce");
   if (!nonce_value) {
     BLOG(ERROR) << "Response missing nonce";
-    OnRefill(FAILED);
+    OnRefill(FAILED, false);
     return;
   }
 
@@ -188,13 +195,7 @@ void RefillTokens::OnGetSignedTokens(
 
   if (response_status_code != net::HTTP_OK) {
     BLOG(ERROR) << "Failed to get signed tokens";
-
-    if (response_status_code == net::HTTP_ACCEPTED) {
-      // Tokens are not ready yet
-      confirmations_->StartRetryingToGetRefillSignedTokens(
-          kRetryGettingRefillSignedTokensAfterSeconds);
-    }
-
+    OnRefill(FAILED);
     return;
   }
 
@@ -202,7 +203,7 @@ void RefillTokens::OnGetSignedTokens(
   base::Optional<base::Value> dictionary = base::JSONReader::Read(response);
   if (!dictionary || !dictionary->is_dict()) {
     BLOG(ERROR) << "Failed to parse response: " << response;
-    OnRefill(FAILED);
+    OnRefill(FAILED, false);
     return;
   }
 
@@ -210,7 +211,7 @@ void RefillTokens::OnGetSignedTokens(
   auto* public_key_value = dictionary->FindKey("publicKey");
   if (!public_key_value) {
     BLOG(ERROR) << "Response missing publicKey";
-    OnRefill(FAILED);
+    OnRefill(FAILED, false);
     return;
   }
 
@@ -220,7 +221,7 @@ void RefillTokens::OnGetSignedTokens(
   if (public_key_base64 != public_key_) {
     BLOG(ERROR) << "Response public_key: " << public_key_value->GetString()
         << " does not match catalog issuers public key: " << public_key_;
-    OnRefill(FAILED);
+    OnRefill(FAILED, false);
     return;
   }
 
@@ -228,7 +229,7 @@ void RefillTokens::OnGetSignedTokens(
   auto* batch_proof_value = dictionary->FindKey("batchProof");
   if (!batch_proof_value) {
     BLOG(ERROR) << "Response missing batchProof";
-    OnRefill(FAILED);
+    OnRefill(FAILED, false);
     return;
   }
 
@@ -239,7 +240,7 @@ void RefillTokens::OnGetSignedTokens(
   auto* signed_tokens_value = dictionary->FindKey("signedTokens");
   if (!signed_tokens_value) {
     BLOG(ERROR) << "Response missing signedTokens";
-    OnRefill(FAILED);
+    OnRefill(FAILED, false);
     return;
   }
 
@@ -280,7 +281,7 @@ void RefillTokens::OnGetSignedTokens(
 
     BLOG(ERROR) << "  Public key: " << public_key_;
 
-    OnRefill(FAILED);
+    OnRefill(FAILED, false);
     return;
   }
 
@@ -300,20 +301,28 @@ void RefillTokens::OnGetSignedTokens(
       << " unblinded tokens, you now have " << unblinded_tokens_->Count()
       << " unblinded tokens";
 
-  OnRefill(SUCCESS);
+  OnRefill(SUCCESS, false);
 }
 
-void RefillTokens::OnRefill(const Result result) {
+void RefillTokens::OnRefill(
+    const Result result,
+    const bool should_retry) {
   if (result != SUCCESS) {
     BLOG(ERROR) << "Failed to refill tokens";
-  } else {
-    confirmations_->SaveState();
 
-    BLOG(INFO) << "Successfully refilled tokens";
+    if (should_retry) {
+      confirmations_->StartRetryingToGetRefillSignedTokens(
+          kRetryGettingRefillSignedTokensAfterSeconds);
+    }
+
+    return;
   }
 
   blinded_tokens_.clear();
   tokens_.clear();
+  confirmations_->SaveState();
+
+  BLOG(INFO) << "Successfully refilled tokens";
 }
 
 bool RefillTokens::ShouldRefillTokens() const {

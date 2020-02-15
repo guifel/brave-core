@@ -51,6 +51,7 @@
 #include "net/url_request/url_request_context.h"
 #include "net/url_request/url_request_context_getter.h"
 #include "services/network/public/mojom/cookie_manager.mojom.h"
+#include "services/network/public/mojom/network_context.mojom.h"
 #include "ui/base/ui_base_types.h"
 
 BraveProfileWriter::BraveProfileWriter(Profile* profile)
@@ -173,8 +174,7 @@ void BraveProfileWriter::OnWalletProperties(
 void BraveProfileWriter::OnRecoverWallet(
     brave_rewards::RewardsService* rewards_service,
     unsigned int result,
-    double balance,
-    std::vector<brave_rewards::Grant> grants) {
+    double balance) {
   rewards_service->RemoveObserver(this);
 
   if (result) {

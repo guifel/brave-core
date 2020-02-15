@@ -124,6 +124,7 @@ const rewardsReducer: Reducer<Rewards.State | undefined> = (state: Rewards.State
       }
 
       state.adsData.adsEnabled = action.payload.adsData.adsEnabled
+      state.adsData.shouldAllowAdConversionTracking = action.payload.adsData.shouldAllowAdConversionTracking
       state.adsData.adsPerHour = action.payload.adsData.adsPerHour
       state.adsData.adsUIEnabled = action.payload.adsData.adsUIEnabled
       state.adsData.adsIsSupported = action.payload.adsData.adsIsSupported
@@ -246,14 +247,6 @@ const rewardsReducer: Reducer<Rewards.State | undefined> = (state: Rewards.State
       chrome.send('brave_rewards.getRewardsMainEnabled', [])
       break
     }
-    case types.ON_CONTRIBUTION_SAVED: {
-      const properties = action.payload.properties
-      console.log(properties)
-      if (properties && properties.success && properties.type === 8) {
-        chrome.send('brave_rewards.getOneTimeTips')
-      }
-      break
-    }
     case types.ON_INLINE_TIP_SETTINGS_CHANGE: {
       if (!state.inlineTip) {
         state.inlineTip = {
@@ -329,6 +322,8 @@ const rewardsReducer: Reducer<Rewards.State | undefined> = (state: Rewards.State
       }
 
       if (data.walletType === 'uphold') {
+        chrome.send('brave_rewards.fetchBalance')
+
         if (data.action === 'authorization') {
           const url = data.args['redirect_url']
           if (url && url.length > 0) {

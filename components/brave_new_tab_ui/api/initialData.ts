@@ -7,12 +7,14 @@ import * as preferencesAPI from './preferences'
 import * as statsAPI from './stats'
 import * as privateTabDataAPI from './privateTabData'
 import * as topSitesAPI from './topSites'
+import * as brandedWallpaper from './brandedWallpaper'
 
 export type InitialData = {
   preferences: preferencesAPI.Preferences
   stats: statsAPI.Stats
   privateTabData: privateTabDataAPI.PrivateTabData
-  topSites: topSitesAPI.TopSitesData
+  topSites: topSitesAPI.TopSitesData,
+  brandedWallpaperData: undefined | NewTab.BrandedWallpaper
 }
 
 export type PreInitialRewardsData = {
@@ -24,26 +26,36 @@ export type PreInitialRewardsData = {
 export type InitialRewardsData = {
   onlyAnonWallet: boolean
   adsEstimatedEarnings: number
-  reports: Record<string, NewTab.RewardsReport>
+  report: NewTab.RewardsBalanceReport
   balance: NewTab.RewardsBalance
 }
+
+const isIncognito: boolean = chrome.extension.inIncognitoContext
 
 // Gets all data required for the first render of the page
 export async function getInitialData (): Promise<InitialData> {
   try {
     console.timeStamp('Getting initial data...')
-    const [preferences, stats, privateTabData, topSites] = await Promise.all([
+    const [
+      preferences,
+      stats,
+      privateTabData,
+      topSites,
+      brandedWallpaperData
+    ] = await Promise.all([
       preferencesAPI.getPreferences(),
       statsAPI.getStats(),
       privateTabDataAPI.getPrivateTabData(),
-      topSitesAPI.getTopSites()
+      topSitesAPI.getTopSites(),
+      !isIncognito ? brandedWallpaper.getBrandedWallpaper() : Promise.resolve(undefined)
     ])
     console.timeStamp('Got all initial data.')
     return {
       preferences,
       stats,
       privateTabData,
-      topSites
+      topSites,
+      brandedWallpaperData
     }
   } catch (e) {
     console.error(e)
@@ -83,7 +95,7 @@ export async function getRewardsInitialData (): Promise<InitialRewardsData> {
     const [
       onlyAnonWallet,
       adsEstimatedEarnings,
-      reports,
+      report,
       balance
     ] = await Promise.all([
       new Promise(resolve => chrome.braveRewards.onlyAnonWallet((onlyAnonWallet: boolean) => {
@@ -92,21 +104,21 @@ export async function getRewardsInitialData (): Promise<InitialRewardsData> {
       new Promise(resolve => chrome.braveRewards.getAdsEstimatedEarnings((adsEstimatedEarnings: number) => {
         resolve(adsEstimatedEarnings)
       })),
-      new Promise(resolve => chrome.braveRewards.getBalanceReports((reports: Record<string, NewTab.RewardsReport>) => {
-        resolve(reports)
+      new Promise(resolve => chrome.braveRewards.getBalanceReport(new Date().getMonth() + 1, new Date().getFullYear(),(report: NewTab.RewardsBalanceReport) => {
+        resolve(report)
       })),
       new Promise(resolve => chrome.braveRewards.fetchBalance((balance: NewTab.RewardsBalance) => {
         resolve(balance)
       })),
       new Promise(resolve => {
-        chrome.braveRewards.getGrants()
+        chrome.braveRewards.fetchPromotions()
         resolve(true)
       })
     ])
     return {
       onlyAnonWallet,
       adsEstimatedEarnings,
-      reports,
+      report,
       balance
     } as InitialRewardsData
   } catch (err) {

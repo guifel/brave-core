@@ -17,7 +17,7 @@ import {
   ShowAdsHistory,
   Tokens
 } from '../../ui/components'
-import { Grid, Column, Select, ControlWrapper } from 'brave-ui/components'
+import { Grid, Column, Select, ControlWrapper, Checkbox } from 'brave-ui/components'
 
 // Utils
 import * as utils from '../utils'
@@ -76,12 +76,14 @@ class AdsBox extends React.Component<Props, State> {
     )
   }
 
-  onAdsSettingChange = (key: string, value: string) => {
+  onAdsSettingChange = (key: string, value: boolean) => {
     let newValue: any = value
-    const { adsEnabled } = this.props.rewardsData.adsData
+    const { adsEnabled, shouldAllowAdConversionTracking } = this.props.rewardsData.adsData
 
     if (key === 'adsEnabled') {
       newValue = !adsEnabled
+    } else if (key === 'shouldAllowAdConversionTracking') {
+      newValue = !shouldAllowAdConversionTracking
     }
 
     this.props.actions.onAdsSettingSave(key, newValue)
@@ -92,7 +94,7 @@ class AdsBox extends React.Component<Props, State> {
       return null
     }
 
-    const { adsPerHour } = this.props.rewardsData.adsData
+    const { adsPerHour, shouldAllowAdConversionTracking } = this.props.rewardsData.adsData
 
     return (
       <Grid columns={1} customStyle={{ margin: '0 auto' }}>
@@ -110,6 +112,18 @@ class AdsBox extends React.Component<Props, State> {
                 )
               })}
             </Select>
+          </ControlWrapper>
+          <ControlWrapper text={getLocale('adsOtherSettings')}>
+            <Checkbox
+              value={{
+                shouldAllowAdConversionTracking: shouldAllowAdConversionTracking
+              }}
+              multiple={true}
+              onChange={this.onAdsSettingChange}
+            >
+              <div data-key='shouldAllowAdConversionTracking'>{getLocale('adsAllowConversionTracking')}</div>
+            </Checkbox>
+            <div>{getLocale('adsAllowConversionTrackingDescription')}</div>
           </ControlWrapper>
         </Column>
       </Grid>
@@ -175,71 +189,95 @@ class AdsBox extends React.Component<Props, State> {
     this.props.actions.toggleFlagAd(uuid, creativeSetId, flagged)
   }
 
-  getAdHistoryData = (adHistoryData: Rewards.AdsHistoryData[], savedOnly: boolean) => {
-    return adHistoryData.map((item: Rewards.AdsHistoryData) => {
-      return {
-        id: item.id,
-        date: new Date(item.timestampInMilliseconds).toLocaleDateString(),
-        adDetailRows: (
-          item.adDetailRows.map((itemDetail: Rewards.AdHistoryDetail) => {
-            let brandInfo = itemDetail.adContent.brandInfo
-            if (brandInfo.length > 50) {
-              brandInfo = brandInfo.substring(0, 50) + '...'
-            }
-            const adContent: Rewards.AdContent = {
-              uuid: itemDetail.adContent.uuid,
-              creativeSetId: itemDetail.adContent.creativeSetId,
-              brand: itemDetail.adContent.brand,
-              brandInfo: brandInfo,
-              brandLogo: itemDetail.adContent.brandLogo,
-              brandDisplayUrl: itemDetail.adContent.brandDisplayUrl,
-              brandUrl: itemDetail.adContent.brandUrl,
-              likeAction: itemDetail.adContent.likeAction,
-              adAction: itemDetail.adContent.adAction,
-              savedAd: itemDetail.adContent.savedAd,
-              flaggedAd: itemDetail.adContent.flaggedAd,
-              onThumbUpPress: () =>
-                this.onThumbUpPress(itemDetail.adContent.uuid,
-                                    itemDetail.adContent.creativeSetId,
-                                    itemDetail.adContent.likeAction),
-              onThumbDownPress: () =>
-                this.onThumbDownPress(itemDetail.adContent.uuid,
-                                      itemDetail.adContent.creativeSetId,
-                                      itemDetail.adContent.likeAction),
-              onMenuSave: () =>
-                this.onMenuSave(itemDetail.adContent.uuid,
-                                itemDetail.adContent.creativeSetId,
-                                itemDetail.adContent.savedAd),
-              onMenuFlag: () =>
-                this.onMenuFlag(itemDetail.adContent.uuid,
-                                itemDetail.adContent.creativeSetId,
-                                itemDetail.adContent.flaggedAd)
-            }
-            const categoryContent: Rewards.CategoryContent = {
-              category: itemDetail.categoryContent.category,
-              optAction: itemDetail.categoryContent.optAction,
-              onOptInAction: () =>
-                this.onOptInAction(itemDetail.categoryContent.category,
-                                   itemDetail.categoryContent.optAction),
-              onOptOutAction: () =>
-                this.onOptOutAction(itemDetail.categoryContent.category,
-                                    itemDetail.categoryContent.optAction)
-            }
-            return {
-              id: itemDetail.id,
-              adContent: adContent,
-              categoryContent: categoryContent
-            }
+  getGroupedAdsHistory = (adsHistory: Rewards.AdsHistory[], savedOnly: boolean) => {
+    let groupedAdsHistory: Rewards.AdsHistory[] = []
+
+    for (let i = 0; i < adsHistory.length; i++) {
+      const adHistory = adsHistory[i]
+
+      const id = adHistory.id
+
+      let flooredDate = new Date(adHistory.timestampInMilliseconds)
+      flooredDate.setHours(0, 0, 0, 0)
+      const flooredDateString = flooredDate.toLocaleDateString()
+
+      for (let j = 0; j < adHistory.adDetailRows.length; j++) {
+        const adDetailRow = this.getAdDetailRow(adHistory.adDetailRows[j])
+
+        const index = groupedAdsHistory.findIndex(item => item.date === flooredDateString)
+        if (index === -1) {
+          groupedAdsHistory.push({
+            id: id,
+            date: flooredDateString,
+            adDetailRows: [adDetailRow]
           })
-        )
+        } else {
+          groupedAdsHistory[index].adDetailRows.push(adDetailRow)
+        }
       }
-    })
+    }
+
+    return groupedAdsHistory
   }
 
-  hasSavedEntries = (adHistoryData: Rewards.AdsHistoryData[]) => {
-    for (let ix = 0; ix < adHistoryData.length; ix++) {
-      for (let jx = 0; jx < adHistoryData[ix].adDetailRows.length; jx++) {
-        if (adHistoryData[ix].adDetailRows[jx].adContent.savedAd) {
+  getAdDetailRow = (adHistory: Rewards.AdHistory) => {
+    let brandInfo = adHistory.adContent.brandInfo
+    if (brandInfo.length > 50) {
+      brandInfo = brandInfo.substring(0, 50) + '...'
+    }
+
+    const adContent: Rewards.AdContent = {
+      uuid: adHistory.adContent.uuid,
+      creativeSetId: adHistory.adContent.creativeSetId,
+      brand: adHistory.adContent.brand,
+      brandInfo: brandInfo,
+      brandLogo: adHistory.adContent.brandLogo,
+      brandDisplayUrl: adHistory.adContent.brandDisplayUrl,
+      brandUrl: adHistory.adContent.brandUrl,
+      likeAction: adHistory.adContent.likeAction,
+      adAction: adHistory.adContent.adAction,
+      savedAd: adHistory.adContent.savedAd,
+      flaggedAd: adHistory.adContent.flaggedAd,
+      onThumbUpPress: () =>
+        this.onThumbUpPress(adHistory.adContent.uuid,
+                            adHistory.adContent.creativeSetId,
+                            adHistory.adContent.likeAction),
+      onThumbDownPress: () =>
+        this.onThumbDownPress(adHistory.adContent.uuid,
+                              adHistory.adContent.creativeSetId,
+                              adHistory.adContent.likeAction),
+      onMenuSave: () =>
+        this.onMenuSave(adHistory.adContent.uuid,
+                        adHistory.adContent.creativeSetId,
+                        adHistory.adContent.savedAd),
+      onMenuFlag: () =>
+        this.onMenuFlag(adHistory.adContent.uuid,
+                        adHistory.adContent.creativeSetId,
+                        adHistory.adContent.flaggedAd)
+    }
+
+    const categoryContent: Rewards.CategoryContent = {
+      category: adHistory.categoryContent.category,
+      optAction: adHistory.categoryContent.optAction,
+      onOptInAction: () =>
+        this.onOptInAction(adHistory.categoryContent.category,
+                           adHistory.categoryContent.optAction),
+      onOptOutAction: () =>
+        this.onOptOutAction(adHistory.categoryContent.category,
+                            adHistory.categoryContent.optAction)
+    }
+
+    return {
+      id: adHistory.id,
+      adContent: adContent,
+      categoryContent: categoryContent
+    }
+  }
+
+  hasSavedEntries = (adHistory: Rewards.AdsHistory[]) => {
+    for (let ix = 0; ix < adHistory.length; ix++) {
+      for (let jx = 0; jx < adHistory[ix].adDetailRows.length; jx++) {
+        if (adHistory[ix].adDetailRows[jx].adContent.savedAd) {
           return true
         }
       }
@@ -254,7 +292,7 @@ class AdsBox extends React.Component<Props, State> {
     let adsPerHour = 0
     let adsUIEnabled = false
     let adsIsSupported = false
-    let estimatedPendingRewards = '0'
+    let estimatedPendingRewards = 0
     let nextPaymentDate = ''
     let adNotificationsReceivedThisMonth = 0
 
@@ -263,15 +301,17 @@ class AdsBox extends React.Component<Props, State> {
       adsHistory,
       enabledMain,
       firstLoad,
-      balance
+      balance,
+      ui
     } = this.props.rewardsData
+    const { onlyAnonWallet } = ui
 
     if (adsData) {
       adsEnabled = adsData.adsEnabled
       adsPerHour = adsData.adsPerHour
       adsUIEnabled = adsData.adsUIEnabled
       adsIsSupported = adsData.adsIsSupported
-      estimatedPendingRewards = (adsData.adsEstimatedPendingRewards || 0).toFixed(1)
+      estimatedPendingRewards = adsData.adsEstimatedPendingRewards || 0
       nextPaymentDate = adsData.adsNextPaymentDate
       adNotificationsReceivedThisMonth = adsData.adsAdNotificationsReceivedThisMonth || 0
     }
@@ -281,15 +321,16 @@ class AdsBox extends React.Component<Props, State> {
     const showDisabled = firstLoad !== false || !toggle || !adsEnabled || !adsIsSupported
 
     const historyEntries = adsHistory || []
-    const rows = this.getAdHistoryData(historyEntries, savedOnly)
+    const rows = this.getGroupedAdsHistory(historyEntries, savedOnly)
     const notEmpty = rows && rows.length !== 0
+    const tokenString = getLocale(onlyAnonWallet ? 'points' : 'tokens')
 
     return (
       <>
         <Box
           title={getLocale('adsTitle')}
           type={'ads'}
-          description={getLocale('adsDesc')}
+          description={getLocale('adsDesc', { currency: tokenString })}
           toggle={toggle}
           checked={enabled}
           settingsChild={this.adsSettings(enabled && enabledMain)}
@@ -302,7 +343,8 @@ class AdsBox extends React.Component<Props, State> {
         >
           <List title={getLocale('adsCurrentEarnings')}>
             <Tokens
-              value={estimatedPendingRewards}
+              onlyAnonWallet={onlyAnonWallet}
+              value={estimatedPendingRewards.toFixed(1)}
               converted={utils.convertBalance(estimatedPendingRewards, balance.rates)}
             />
           </List>

@@ -33,10 +33,8 @@ class BatLedgerClientMojoProxy : public ledger::LedgerClient,
       ledger::WalletPropertiesPtr properties) override;
   void OnReconcileComplete(ledger::Result result,
                            const std::string& viewing_id,
-                           const std::string& probi,
+                           const double amount,
                            const ledger::RewardsType type) override;
-  void OnGrantFinish(ledger::Result result,
-                     ledger::GrantPtr grant) override;
   void LoadLedgerState(ledger::OnLoadCallback callback) override;
   void LoadPublisherState(ledger::OnLoadCallback callback) override;
   void SaveLedgerState(const std::string& ledger_state,
@@ -66,14 +64,13 @@ class BatLedgerClientMojoProxy : public ledger::LedgerClient,
   void FetchFavIcon(const std::string& url,
                     const std::string& favicon_key,
                     ledger::FetchIconCallback callback) override;
-  void SaveContributionInfo(const std::string& probi,
-                            const ledger::ActivityMonth month,
-                            const int year,
-                            const uint32_t date,
-                            const std::string& publisher_key,
-                            const ledger::RewardsType type) override;
-  void SaveRecurringTip(
+
+  void SaveContributionInfo(
       ledger::ContributionInfoPtr info,
+      ledger::ResultCallback callback) override;
+
+  void SaveRecurringTip(
+      ledger::RecurringTipPtr info,
       ledger::SaveRecurringTipCallback callback) override;
   void GetRecurringTips(ledger::PublisherInfoListCallback callback) override;
   void GetOneTimeTips(ledger::PublisherInfoListCallback callback) override;
@@ -110,9 +107,6 @@ class BatLedgerClientMojoProxy : public ledger::LedgerClient,
 
   void SaveNormalizedPublisherList(
       ledger::PublisherInfoList normalized_list) override;
-
-  void OnGrantViaSafetynetCheck(
-      const std::string& promotion_id, const std::string& nonce) override;
 
   void SaveState(const std::string& name,
                  const std::string& value,
@@ -151,9 +145,7 @@ class BatLedgerClientMojoProxy : public ledger::LedgerClient,
       ledger::PendingContributionInfoListCallback callback) override;
 
   void RemovePendingContribution(
-      const std::string& publisher_key,
-      const std::string& viewing_id,
-      uint64_t added_date,
+      const uint64_t id,
       ledger::RemovePendingContributionCallback callback) override;
 
   void RemoveAllPendingContributions(
@@ -211,6 +203,66 @@ class BatLedgerClientMojoProxy : public ledger::LedgerClient,
 
   void GetFirstContributionQueue(
       ledger::GetFirstContributionQueueCallback callback) override;
+
+  void InsertOrUpdatePromotion(
+      ledger::PromotionPtr info,
+      ledger::ResultCallback callback) override;
+
+  void GetPromotion(
+      const std::string& id,
+      ledger::GetPromotionCallback callback) override;
+
+  void GetAllPromotions(
+    ledger::GetAllPromotionsCallback callback) override;
+
+  void InsertOrUpdateUnblindedToken(
+      ledger::UnblindedTokenPtr info,
+      ledger::ResultCallback callback) override;
+
+  void GetAllUnblindedTokens(
+      ledger::GetAllUnblindedTokensCallback callback) override;
+
+  void DeleteUnblindedTokens(
+      const std::vector<std::string>& id_list,
+      ledger::ResultCallback callback) override;
+
+  void DeleteUnblindedTokensForPromotion(
+      const std::string& promotion_id,
+      ledger::ResultCallback callback) override;
+
+  ledger::ClientInfoPtr GetClientInfo() override;
+
+  void UnblindedTokensReady() override;
+
+  void GetTransactionReport(
+      const ledger::ActivityMonth month,
+      const int year,
+      ledger::GetTransactionReportCallback callback) override;
+
+  void GetContributionReport(
+      const ledger::ActivityMonth month,
+      const int year,
+      ledger::GetContributionReportCallback callback) override;
+
+  void GetIncompleteContributions(
+      ledger::GetIncompleteContributionsCallback callback) override;
+
+  void GetContributionInfo(
+      const std::string& contribution_id,
+      ledger::GetContributionInfoCallback callback) override;
+
+  void UpdateContributionInfoStepAndCount(
+      const std::string& contribution_id,
+      const ledger::ContributionStep step,
+      const int32_t retry_count,
+      ledger::ResultCallback callback) override;
+
+  void UpdateContributionInfoContributedAmount(
+      const std::string& contribution_id,
+      const std::string& publisher_key,
+      ledger::ResultCallback callback) override;
+
+  void ReconcileStampReset() override;
 
  private:
   bool Connected() const;

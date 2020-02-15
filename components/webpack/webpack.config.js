@@ -1,5 +1,13 @@
+// Copyright (c) 2019 The Brave Authors. All rights reserved.
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this file,
+// you can obtain one at http://mozilla.org/MPL/2.0/.
+
 const path = require('path')
 const GenerateDepfilePlugin = require('./webpack-plugin-depfile')
+const createStyledComponentsTransformer = require('typescript-plugin-styled-components').default
+
+const styledComponentsTransformer = createStyledComponentsTransformer()
 
 module.exports = (env, argv) => ({
   devtool: argv.mode === 'development' ? '#inline-source-map' : false,
@@ -27,7 +35,12 @@ module.exports = (env, argv) => ({
     rules: [
       {
         test: /\.tsx?$/,
-        loader: 'awesome-typescript-loader'
+        loader: 'ts-loader',
+        exclude: /node_modules\/(?!brave-ui)/,
+        options: {
+          getCustomTransformers: path.join(__dirname, './webpack-ts-transformers.js'),
+          allowTsInNodeModules: true
+        }
       },
       {
         test: /\.css$/,

@@ -76,6 +76,11 @@ if (is_android) {
     sources = [
       "$root_build_dir/brave_resources.pak",
       "$root_build_dir/brave_100_percent.pak",
+      "//brave/android/sync/android_sync.js",
+      "//brave/android/sync/android_sync_words.js",
+      "//brave/android/sync/crypto.js",
+      "//brave/components/brave_sync/extension/brave-sync/bundles/bundle.js",
+      "//brave/LICENSE.html",
     ]
     deps = [
       "//brave:browser_dependencies",
@@ -166,9 +171,16 @@ copy("theme_files") {
 }
 
 group("create_dist") {
-  deps = [
-    ":create_dist_zips"
-  ]
+  deps = []
+  if (is_android) {
+    deps += [
+      "app/$target_os:create_dist_zips"
+    ]
+  } else {
+    deps += [
+      ":create_dist_zips"
+    ]
+  }
   if (is_win) {
     deps += [
       "//chrome/installer/mini_installer",
@@ -332,7 +344,6 @@ if (!is_android && !is_ios) {
       ]
 
       if (v8_use_external_startup_data) {
-        sources += [ "$root_out_dir/natives_blob.bin" ]
         deps += [ "//v8" ]
 
         if (use_v8_context_snapshot) {

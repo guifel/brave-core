@@ -16,13 +16,14 @@ namespace ads {
 
 #define PRODUCTION_SERVER "https://ads-serve.brave.com"
 #define STAGING_SERVER "https://ads-serve.bravesoftware.com"
-#define DEVELOPMENT_SERVER "https://ads-serve.brave.software.com"
+#define DEVELOPMENT_SERVER "https://ads-serve.brave.software"
 
-#define CATALOG_PATH "/v1/catalog"
+#define CATALOG_PATH "/v2/catalog"
 
 const int kIdleThresholdInSeconds = 15;
 
 const uint64_t kMaximumEntriesInPageScoreHistory = 5;
+const int kWinningCategoryCountForServingAds = 3;
 
 // Maximum entries based upon 7 days of history, 20 ads per day and 4
 // confirmation types
@@ -39,6 +40,11 @@ const uint64_t kSustainAdInteractionAfterSeconds = 10;
 
 const uint64_t kDefaultCatalogPing = 2 * base::Time::kSecondsPerHour;
 const uint64_t kDebugCatalogPing = 15 * base::Time::kSecondsPerMinute;
+
+const int kDebugAdConversionFrequency = 10 * base::Time::kSecondsPerMinute;
+const int kAdConversionFrequency =
+    base::Time::kHoursPerDay * base::Time::kSecondsPerHour;
+const int kExpiredAdConversionFrequency = 5 * base::Time::kSecondsPerMinute;
 
 const char kDefaultLanguage[] = "en";
 const char kDefaultRegion[] = "US";
@@ -101,7 +107,52 @@ const std::map<int, std::map<std::string, bool>> kSupportedRegionsSchemas = {
     4, {
       { "KY", true  }   // Cayman Islands
     }
+  },
+  {
+    5, {
+      { "AE", false },  // United Arab Emirates
+      { "AL", false },  // Albania
+      { "AZ", false },  // Azerbaijan
+      { "BD", false },  // Bangladesh
+      { "BE", false },  // Belgium
+      { "BG", false },  // Bulgaria
+      { "CN", false },  // China
+      { "CZ", false },  // Czechia
+      { "DZ", false },  // Algeria
+      { "EG", false },  // Egypt
+      { "ES", false },  // Spain
+      { "FI", false },  // Finland
+      { "GR", false },  // Greece
+      { "HK", false },  // Hong Kong
+      { "HR", false },  // Croatia
+      { "HU", false },  // Hungary
+      { "ID", false },  // Indonesia
+      { "IQ", false },  // Iraq
+      { "KH", false },  // Cambodia
+      { "LT", false },  // Lithuania
+      { "MA", false },  // Morocco
+      { "MY", false },  // Malaysia
+      { "NG", false },  // Nigeria
+      { "NO", false },  // Norway
+      { "PK", false },  // Pakistan
+      { "PT", false },  // Portugal
+      { "RO", false },  // Romania
+      { "RS", false },  // Serbia
+      { "RU", false },  // Russian Federation
+      { "SA", false },  // Saudi Arabia
+      { "SI", false },  // Slovenia
+      { "SK", false },  // Slovakia
+      { "TH", false },  // Thailand
+      { "TR", false },  // Turkey
+      { "TW", false },  // Taiwan
+      { "UA", false },  // Ukraine
+      { "VN", false }   // Vietnam
+    }
   }
+
+  // IMPORTANT: When adding new schema versions |newly_supported_locale_| must
+  // be updated in |BraveRewardsBrowserTest| to reflect a locale from the latest
+  // schema version in "bat-native-ads/src/bat/ads/internal/static_values.h"
 };
 
 const char kUntargetedPageClassification[] = "untargeted";

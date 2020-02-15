@@ -57,7 +57,8 @@ export const newTabInitialState: NewTab.ApplicationState = {
       adsBlockedStat: 0,
       javascriptBlockedStat: 0,
       httpsUpgradesStat: 0,
-      fingerprintingBlockedStat: 0
+      fingerprintingBlockedStat: 0,
+      bandwidthSavedStat: 0
     }
   }
 }
@@ -216,6 +217,9 @@ export const getMockChrome = () => {
       },
       getBraveShieldsEnabledAsync: function (url: string) {
         return Promise.resolve(false)
+      },
+      getCosmeticFilteringEnabledAsync: function (url: string) {
+        return Promise.resolve(true)
       },
       getAdControlTypeAsync: function (url: string) {
         return Promise.resolve('block')

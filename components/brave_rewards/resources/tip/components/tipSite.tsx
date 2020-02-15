@@ -15,6 +15,8 @@ import * as rewardsActions from '../actions/tip_actions'
 interface Props extends RewardsTip.ComponentProps {
   url: string
   monthly: boolean
+  monthlyDate?: string
+  amount?: string
   publisher: RewardsTip.Publisher
 }
 
@@ -37,7 +39,7 @@ class TipSite extends React.Component<Props, {}> {
   }
 
   render () {
-    const { finished, error } = this.props.rewardsDonateData
+    const { finished, error, onlyAnonWallet } = this.props.rewardsDonateData
 
     return (
       <>
@@ -48,6 +50,9 @@ class TipSite extends React.Component<Props, {}> {
               monthly={this.props.monthly}
               publisher={this.props.publisher}
               onTweet={this.onTweet}
+              onlyAnonWallet={onlyAnonWallet}
+              monthlyDate={this.props.monthlyDate}
+              amount={this.props.amount}
           />
           : null
         }

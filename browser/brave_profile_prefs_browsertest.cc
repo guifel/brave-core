@@ -4,6 +4,8 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "brave/common/pref_names.h"
+#include "brave/components/brave_wayback_machine/buildflags.h"
+#include "brave/common/brave_wallet_constants.h"
 #include "chrome/browser/net/prediction_options.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
@@ -20,6 +22,10 @@
 #include "components/gcm_driver/gcm_channel_status_syncer.h"
 #endif
 
+#if BUILDFLAG(ENABLE_BRAVE_WAYBACK_MACHINE)
+#include "brave/components/brave_wayback_machine/pref_names.h"
+#endif
+
 using BraveProfilePrefsBrowserTest = InProcessBrowserTest;
 
 // Check download prompt preference is set to true by default.
@@ -29,14 +35,14 @@ IN_PROC_BROWSER_TEST_F(BraveProfilePrefsBrowserTest, DownloadPromptDefault) {
 }
 
 IN_PROC_BROWSER_TEST_F(BraveProfilePrefsBrowserTest, MiscBravePrefs) {
-  EXPECT_FALSE(
-      browser()->profile()->GetPrefs()->GetBoolean(kWidevineOptedIn));
   EXPECT_TRUE(browser()->profile()->GetPrefs()->GetBoolean(
       kHTTPSEVerywhereControlType));
   EXPECT_FALSE(
       browser()->profile()->GetPrefs()->GetBoolean(kNoScriptControlType));
   EXPECT_TRUE(
       browser()->profile()->GetPrefs()->GetBoolean(kAdControlType));
+  EXPECT_TRUE(
+      browser()->profile()->GetPrefs()->GetBoolean(kGoogleLoginControlType));
   EXPECT_TRUE(
       browser()->profile()->GetPrefs()->GetBoolean(kFBEmbedControlType));
   EXPECT_TRUE(
@@ -45,15 +51,20 @@ IN_PROC_BROWSER_TEST_F(BraveProfilePrefsBrowserTest, MiscBravePrefs) {
       browser()->profile()->GetPrefs()->GetBoolean(kLinkedInEmbedControlType));
   EXPECT_TRUE(
       browser()->profile()->GetPrefs()->GetBoolean(kWebTorrentEnabled));
+#if BUILDFLAG(ENABLE_BRAVE_WAYBACK_MACHINE)
+  EXPECT_TRUE(browser()->profile()->GetPrefs()->
+      GetBoolean(kBraveWaybackMachineEnabled));
+#endif
   EXPECT_TRUE(
       browser()->profile()->GetPrefs()->GetBoolean(kHangoutsEnabled));
   EXPECT_FALSE(
       browser()->profile()->GetPrefs()->GetBoolean(kHideBraveRewardsButton));
   EXPECT_FALSE(
       browser()->profile()->GetPrefs()->GetBoolean(kIPFSCompanionEnabled));
-  EXPECT_TRUE(
-      browser()->profile()->GetPrefs()->GetBoolean(kBraveWalletEnabled));
-  EXPECT_FALSE(
+  EXPECT_EQ(
+      browser()->profile()->GetPrefs()->GetInteger(kBraveWalletWeb3Provider),
+      static_cast<int>(BraveWalletWeb3ProviderTypes::ASK));
+    EXPECT_FALSE(
       browser()->profile()->GetPrefs()->GetBoolean(kMRUCyclingEnabled));
 
 #if !BUILDFLAG(USE_GCM_FROM_PLATFORM)

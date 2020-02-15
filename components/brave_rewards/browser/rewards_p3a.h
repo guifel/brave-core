@@ -22,10 +22,12 @@ class DictionaryValue;
 
 namespace brave_rewards {
 
-void RecordWalletBalanceP3A(bool wallet_created, size_t balance);
+void RecordWalletBalanceP3A(bool wallet_created, bool rewards_enabled,
+                            size_t balance);
 
 enum class AutoContributionsP3AState {
   kNoWallet,
+  kRewardsDisabled,
   kWalletCreatedAutoContributeOff,
   kAutoContributeOn,
 };
@@ -33,11 +35,13 @@ enum class AutoContributionsP3AState {
 void RecordAutoContributionsState(AutoContributionsP3AState state, int count);
 
 void RecordTipsState(bool wallet_created,
+                     bool rewards_enabled,
                      int one_time_count,
                      int recurring_count);
 
 enum class AdsP3AState {
   kNoWallet,
+  kRewardsDisabled,
   kAdsDisabled,
   kAdsEnabled,
   kAdsEnabledThenDisabledRewardsOn,
@@ -50,7 +54,13 @@ void RecordAdsState(AdsP3AState state);
 void UpdateAdsP3AOnPreferenceChange(PrefService* prefs,
                                     const std::string& pref);
 
+// Records an initial metric state ("disabled" or "enabled") if it was not done
+// before. Intended to be called if the user has already created a wallet.
+void MaybeRecordInitialAdsP3AState(PrefService* local_state);
+
 void RecordNoWalletCreatedForAllMetrics();
+
+void RecordRewardsDisabledForSomeMetrics();
 
 double CalcWalletBalanceForP3A(base::flat_map<std::string, double> wallets,
                                std::string user_funds);

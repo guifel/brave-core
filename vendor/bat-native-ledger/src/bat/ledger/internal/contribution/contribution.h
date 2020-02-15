@@ -14,7 +14,7 @@
 
 #include "base/gtest_prod_util.h"
 #include "bat/ledger/ledger.h"
-#include "bat/ledger/internal/bat_helper.h"
+#include "bat/ledger/internal/properties/current_reconcile_properties.h"
 
 // Contribution has two big phases. PHASE 1 is starting the contribution,
 // getting surveyors and transferring BAT from the wallet.
@@ -82,23 +82,16 @@ namespace bat_ledger {
 class LedgerImpl;
 }
 
-namespace braveledger_contribution {
-class PhaseOne;
-}
-
-namespace braveledger_contribution {
-class PhaseTwo;
-}
-
-namespace braveledger_contribution {
-class Unverified;
-}
-
 namespace braveledger_uphold {
 class Uphold;
 }
 
 namespace braveledger_contribution {
+
+class PhaseOne;
+class PhaseTwo;
+class Unverified;
+class Unblinded;
 
 static const uint64_t phase_one_timers[] = {
     1 * 60 * 60,  // 1h
@@ -144,13 +137,20 @@ class Contribution {
 
   // Does final stage in contribution
   // Sets reports and contribution info
-  void OnReconcileCompleteSuccess(
+  // DEPRECATED
+  void ReconcileSuccess(
       const std::string& viewing_id,
+      const double amount,
+      const bool delete_reconcile);
+
+  // Does final stage in contribution
+  // Sets reports and contribution info
+  void ContributionCompleted(
+      const std::string& contribution_id,
       const ledger::RewardsType type,
-      const std::string& probi,
-      ledger::ActivityMonth month,
-      int year,
-      uint32_t date);
+      const double amount,
+      const ledger::Result result);
+
   void HasSufficientBalance(
     ledger::HasSufficientBalanceToReconcileCallback callback);
 
@@ -163,10 +163,16 @@ class Contribution {
 
   void SetTimer(uint32_t* timer_id, uint64_t start_timer_in = 0);
 
+  // DEPRECATED
   void AddRetry(
     ledger::ContributionRetry step,
     const std::string& viewing_id,
-    braveledger_bat_helper::CURRENT_RECONCILE reconcile = {});
+    ledger::CurrentReconcileProperties reconcile = {});
+
+  void UpdateContributionStepAndCount(
+      const std::string& contribution_id,
+      const ledger::ContributionStep step,
+      const int32_t retry_count);
 
   // Resets reconcile stamps
   void ResetReconcileStamp();
@@ -180,7 +186,7 @@ class Contribution {
 
   void DoDirectTip(
       const std::string& publisher_key,
-      int amount,
+      double amount,
       const std::string& currency,
       ledger::DoDirectTipCallback callback);
 
@@ -213,13 +219,18 @@ class Contribution {
       const ledger::Result result,
       ledger::BalancePtr info);
 
+  // DEPRECATED
   uint64_t GetRetryTimer(ledger::ContributionRetry step,
                          const std::string& viewing_id,
-                         braveledger_bat_helper::CURRENT_RECONCILE* reconcile);
+                         ledger::CurrentReconcileProperties* reconcile);
 
+  // DEPRECATED
   int GetRetryPhase(ledger::ContributionRetry step);
 
+  // DEPRECATED
   void DoRetry(const std::string& viewing_id);
+
+  void CheckStep(const std::string& contribution_id);
 
   void OnHasSufficientBalance(
       const ledger::PublisherInfoList& publisher_list,
@@ -244,7 +255,7 @@ class Contribution {
   void OnDoDirectTipServerPublisher(
     ledger::ServerPublisherInfoPtr server_info,
     const std::string& publisher_key,
-    int amount,
+    double amount,
     const std::string& currency,
     ledger::DoDirectTipCallback callback);
 
@@ -253,16 +264,30 @@ class Contribution {
       double* fee,
       const double balance);
 
+  bool ProcessReconcileUnblindedTokens(
+      ledger::BalancePtr info,
+      ledger::RewardsType type,
+      double* fee,
+      ledger::ReconcileDirections directions,
+      ledger::ReconcileDirections* leftovers);
+
+  bool ProcessReconcileAnonize(
+      ledger::BalancePtr info,
+      ledger::RewardsType type,
+      double* fee,
+      ledger::ReconcileDirections directions,
+      ledger::ReconcileDirections* leftovers);
+
   void ProcessReconcile(
-    ledger::ContributionQueuePtr contribution,
-    ledger::BalancePtr info);
+      ledger::ContributionQueuePtr contribution,
+      ledger::BalancePtr info);
 
   void DeleteContributionQueue(ledger::ContributionQueuePtr contribution);
 
   void AdjustTipsAmounts(
-    braveledger_bat_helper::Directions directions,
-    braveledger_bat_helper::Directions* wallet_directions,
-    braveledger_bat_helper::Directions* anon_directions,
+    ledger::ReconcileDirections original_directions,
+    ledger::ReconcileDirections* primary_directions,
+    ledger::ReconcileDirections* rest_directions,
     double reduce_fee_for);
 
   void OnExternalWallets(
@@ -273,21 +298,25 @@ class Contribution {
   void OnExternalWalletServerPublisherInfo(
       ledger::ServerPublisherInfoPtr info,
       const std::string& viewing_id,
-      int amount,
+      double amount,
       const ledger::ExternalWallet& wallet);
 
   void OnUpholdAC(ledger::Result result,
                   bool created,
                   const std::string& viewing_id);
 
+  void OnDeleteContributionQueue(const ledger::Result result);
+
   bat_ledger::LedgerImpl* ledger_;  // NOT OWNED
   std::unique_ptr<PhaseOne> phase_one_;
   std::unique_ptr<PhaseTwo> phase_two_;
   std::unique_ptr<Unverified> unverified_;
+  std::unique_ptr<Unblinded> unblinded_;
   std::unique_ptr<braveledger_uphold::Uphold> uphold_;
   uint32_t last_reconcile_timer_id_;
   std::map<std::string, uint32_t> retry_timers_;
   uint32_t queue_timer_id_;
+  bool queue_in_progress_ = false;
 
   // For testing purposes
   friend class ContributionTest;

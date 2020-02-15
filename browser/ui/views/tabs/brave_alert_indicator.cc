@@ -15,14 +15,15 @@
 #include "chrome/browser/ui/views/tabs/tab_strip_controller.h"
 #include "chrome/browser/ui/views/tabs/tab_style_views.h"
 #include "content/public/browser/web_contents.h"
+#include "third_party/skia/include/core/SkPathTypes.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/views/background.h"
 
 namespace {
 
-bool IsAudioState(TabAlertState state) {
-  return (state == TabAlertState::AUDIO_PLAYING ||
-          state == TabAlertState::AUDIO_MUTING);
+bool IsAudioState(const base::Optional<TabAlertState>& state) {
+  return (state.has_value() && (state.value() == TabAlertState::AUDIO_PLAYING ||
+                                state.value() == TabAlertState::AUDIO_MUTING));
 }
 
 }  // namespace
@@ -35,9 +36,12 @@ class BraveAlertIndicator::BraveAlertBackground : public views::Background {
 
   // views::Background overrides:
   void Paint(gfx::Canvas* canvas, views::View* view) const override {
+    if (!host_view_->IsTabAudioToggleable())
+      return;
+
     gfx::Point center = host_view_->GetContentsBounds().CenterPoint();
     SkPath path;
-    path.setFillType(SkPath::kEvenOdd_FillType);
+    path.setFillType(SkPathFillType::kEvenOdd);
     path.addCircle(center.x(), center.y(), host_view_->width() / 2);
     cc::PaintFlags flags;
     flags.setAntiAlias(true);
@@ -58,7 +62,7 @@ BraveAlertIndicator::BraveAlertIndicator(Tab* parent_tab)
 
 SkColor BraveAlertIndicator::GetBackgroundColor() const {
   TabStyle::TabColors colors = parent_tab_->tab_style()->CalculateColors();
-  if (!IsAudioState(alert_state_) || !IsMouseHovered())
+  if (!IsTabAudioToggleable() || !IsMouseHovered())
     return colors.background_color;
 
   // Approximating the InkDrop behavior of the close button.
@@ -70,7 +74,7 @@ bool BraveAlertIndicator::OnMousePressed(const ui::MouseEvent& event) {
   mouse_pressed_ = true;
   SchedulePaint();
 
-  if (!IsAudioState(alert_state_))
+  if (!IsTabAudioToggleable())
     return AlertIndicator::OnMousePressed(event);
 
   return true;
@@ -80,18 +84,14 @@ void BraveAlertIndicator::OnMouseReleased(const ui::MouseEvent& event) {
   mouse_pressed_ = false;
   SchedulePaint();
 
-  if (!IsAudioState(alert_state_) || !IsMouseHovered())
+  if (!IsTabAudioToggleable() || !IsMouseHovered())
     return AlertIndicator::OnMouseReleased(event);
 
   auto* tab_strip = static_cast<TabStrip*>(parent_tab_->controller());
-  const int tab_index = tab_strip->GetModelIndexOfTab(parent_tab_);
+  const int tab_index = tab_strip->GetModelIndexOf(parent_tab_);
   auto* tab_strip_model = static_cast<BrowserTabStripController*>(
       tab_strip->controller())->model();
   auto* web_contents = tab_strip_model->GetWebContentsAt(tab_index);
-
-  if (!chrome::CanToggleAudioMute(web_contents))
-    return AlertIndicator::OnMouseReleased(event);
-
   chrome::SetTabAudioMuted(web_contents,
                            !web_contents->IsAudioMuted(),
                            TabMutedReason::CONTEXT_MENU,
@@ -99,19 +99,26 @@ void BraveAlertIndicator::OnMouseReleased(const ui::MouseEvent& event) {
 }
 
 void BraveAlertIndicator::OnMouseEntered(const ui::MouseEvent& event) {
-  if (IsAudioState(alert_state_))
+  if (IsTabAudioToggleable())
     SchedulePaint();
   AlertIndicator::OnMouseExited(event);
 }
 
 void BraveAlertIndicator::OnMouseExited(const ui::MouseEvent& event) {
-  if (IsAudioState(alert_state_))
+  if (IsTabAudioToggleable())
     SchedulePaint();
   AlertIndicator::OnMouseExited(event);
 }
 
 bool BraveAlertIndicator::OnMouseDragged(const ui::MouseEvent& event) {
-  if (IsAudioState(alert_state_))
+  if (IsTabAudioToggleable())
     SchedulePaint();
   return AlertIndicator::OnMouseDragged(event);
+}
+
+bool BraveAlertIndicator::IsTabAudioToggleable() const {
+  if (parent_tab_->controller()->IsTabPinned(parent_tab_))
+    return false;
+
+  return IsAudioState(alert_state_);
 }

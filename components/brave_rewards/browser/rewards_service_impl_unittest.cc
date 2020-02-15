@@ -29,21 +29,20 @@ class MockRewardsServiceObserver : public RewardsServiceObserver {
   MOCK_METHOD3(OnWalletProperties, void(RewardsService*,
       int,
       std::unique_ptr<brave_rewards::WalletProperties>));
-  MOCK_METHOD3(OnGrant,
-      void(RewardsService*, unsigned int, brave_rewards::Grant));
-  MOCK_METHOD3(OnGrantCaptcha,
-      void(RewardsService*, std::string, std::string));
-  MOCK_METHOD4(OnRecoverWallet, void(RewardsService*,
+  MOCK_METHOD3(OnFetchPromotions, void(RewardsService*,
+      const uint32_t,
+      const std::vector<brave_rewards::Promotion>& list));
+  MOCK_METHOD3(OnRecoverWallet, void(RewardsService*,
                                      unsigned int,
-                                     double,
-                                     std::vector<brave_rewards::Grant>));
-  MOCK_METHOD3(OnGrantFinish,
-      void(RewardsService*, unsigned int, brave_rewards::Grant));
+                                     double));
+  MOCK_METHOD3(OnPromotionFinished, void(RewardsService*,
+      const uint32_t,
+      brave_rewards::Promotion));
   MOCK_METHOD1(OnContentSiteUpdated, void(RewardsService*));
   MOCK_METHOD5(OnReconcileComplete, void(RewardsService*,
                                          unsigned int,
                                          const std::string&,
-                                         const std::string&,
+                                         const double,
                                          const int32_t));
   MOCK_METHOD2(OnGetRecurringTips,
       void(RewardsService*, const brave_rewards::ContentSiteList&));
@@ -85,7 +84,7 @@ class RewardsServiceTest : public testing::Test {
   // Need this as a very first member to run tests in UI thread
   // When this is set, class should not install any other MessageLoops, like
   // base::test::ScopedTaskEnvironment
-  content::TestBrowserThreadBundle thread_bundle_;
+  content::BrowserTaskEnvironment task_environment_;
   std::unique_ptr<Profile> profile_;
   RewardsServiceImpl* rewards_service_;
   std::unique_ptr<MockRewardsServiceObserver> observer_;

@@ -13,8 +13,7 @@ import android.content.Intent;
 import android.os.IBinder;
 import android.util.Log;
 
-// TODO
-// import org.chromium.chrome.browser.BraveAdsNativeHelper;
+import org.chromium.chrome.browser.BraveAdsNativeHelper;
 import org.chromium.chrome.browser.BraveRewardsNativeWorker;
 import org.chromium.chrome.browser.BraveRewardsObserver;
 import org.chromium.chrome.browser.profiles.Profile;
@@ -65,8 +64,7 @@ public class BraveRewardsService extends Service implements BraveRewardsObserver
         if (BraveRewardsNativeWorker.WALLET_CREATED == error_code
                 && OnboardingPrefManager.getInstance().isAdsAvailable()) {
             // Enable ads
-            // TODO
-            // BraveAdsNativeHelper.nativeSetAdsEnabled(Profile.getLastUsedProfile());
+            BraveAdsNativeHelper.nativeSetAdsEnabled(Profile.getLastUsedProfile());
         } else {
             // TODO: handle wallet creation problem
         }
@@ -80,7 +78,7 @@ public class BraveRewardsService extends Service implements BraveRewardsObserver
     public void OnPublisherInfo(int tabId){};
 
     @Override
-    public void OnGetCurrentBalanceReport(String[] report){};
+    public void OnGetCurrentBalanceReport(double[] report){};
 
     @Override
     public void OnNotificationAdded(String id, int type, long timestamp, String[] args){};
@@ -117,4 +115,7 @@ public class BraveRewardsService extends Service implements BraveRewardsObserver
 
     @Override
     public void OnRewardsMainEnabled(boolean enabled){};
+
+    @Override
+    public void OnFetchPromotions() {}
 }

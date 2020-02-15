@@ -28,10 +28,10 @@ FORWARD_DECLARE_TEST(BraveSyncServiceTest, OnDeleteDevice);
 FORWARD_DECLARE_TEST(BraveSyncServiceTest, OnDeleteDeviceWhenOneDevice);
 FORWARD_DECLARE_TEST(BraveSyncServiceTest, OnDeleteDeviceWhenSelfDeleted);
 FORWARD_DECLARE_TEST(BraveSyncServiceTest, OnResetSync);
+FORWARD_DECLARE_TEST(BraveSyncServiceTest, OnResetSyncWhenOffline);
 FORWARD_DECLARE_TEST(BraveSyncServiceTest, ClientOnGetInitData);
 FORWARD_DECLARE_TEST(BraveSyncServiceTest, OnGetInitData);
 FORWARD_DECLARE_TEST(BraveSyncServiceTest, OnSaveBookmarksBaseOrder);
-FORWARD_DECLARE_TEST(BraveSyncServiceTest, OnCompactComplete);
 FORWARD_DECLARE_TEST(BraveSyncServiceTest, OnSyncPrefsChanged);
 FORWARD_DECLARE_TEST(BraveSyncServiceTest, OnSyncDebug);
 FORWARD_DECLARE_TEST(BraveSyncServiceTest, StartSyncNonDeviceRecords);
@@ -42,6 +42,13 @@ FORWARD_DECLARE_TEST(BraveSyncServiceTest,
 FORWARD_DECLARE_TEST(BraveSyncServiceTest, ExponentialResend);
 FORWARD_DECLARE_TEST(BraveSyncServiceTest, GetDevicesWithFetchSyncRecords);
 FORWARD_DECLARE_TEST(BraveSyncServiceTest, SendCompact);
+FORWARD_DECLARE_TEST(BraveSyncServiceTest, SetSyncEnabled);
+FORWARD_DECLARE_TEST(BraveSyncServiceTest, SetSyncDisabled);
+FORWARD_DECLARE_TEST(BraveSyncServiceTest, IsSyncReadyOnNewProfile);
+FORWARD_DECLARE_TEST(BraveSyncServiceTest, SetThisDeviceCreatedTime);
+FORWARD_DECLARE_TEST(BraveSyncServiceTest, InitialFetchesStartWithZero);
+FORWARD_DECLARE_TEST(BraveSyncServiceTest, DeviceIdV2Migration);
+FORWARD_DECLARE_TEST(BraveSyncServiceTest, DeviceIdV2MigrationDupDeviceId);
 
 class BraveSyncServiceTest;
 
@@ -65,7 +72,7 @@ class BraveProfileSyncServiceImpl
   void OnSetupSyncHaveCode(const std::string& sync_words,
                            const std::string& device_name) override;
   void OnSetupSyncNewToSync(const std::string& device_name) override;
-  void OnDeleteDevice(const std::string& device_id) override;
+  void OnDeleteDevice(const std::string& device_id_v2) override;
   void OnResetSync() override;
   void GetSettingsAndDevices(
       const GetSettingsAndDevicesCallback& callback) override;
@@ -83,7 +90,8 @@ class BraveProfileSyncServiceImpl
   void OnSyncSetupError(const std::string& error) override;
   void OnGetInitData(const std::string& sync_version) override;
   void OnSaveInitData(const brave_sync::Uint8Array& seed,
-                      const brave_sync::Uint8Array& device_id) override;
+                      const brave_sync::Uint8Array& device_id,
+                      const std::string& device_id_v2) override;
   void OnSyncReady() override;
   void OnGetExistingObjects(const std::string& category_name,
                             std::unique_ptr<brave_sync::RecordsList> records,
@@ -96,6 +104,9 @@ class BraveProfileSyncServiceImpl
   void OnDeleteSyncSiteSettings() override;
   void OnSaveBookmarksBaseOrder(const std::string& order) override;
   void OnCompactComplete(const std::string& category_name) override;
+  void OnRecordsSent(
+      const std::string& category_name,
+      std::unique_ptr<brave_sync::RecordsList> records) override;
 
   // syncer::SyncService implementation
   int GetDisableReasons() const override;
@@ -114,8 +125,6 @@ class BraveProfileSyncServiceImpl
 #endif
 
   bool IsBraveSyncEnabled() const override;
-  bool IsBraveSyncInitialized() const;
-  bool IsBraveSyncConfigured() const;
 
   syncer::ModelTypeSet GetPreferredDataTypes() const override;
 
@@ -136,9 +145,9 @@ class BraveProfileSyncServiceImpl
   FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest,
                            OnDeleteDeviceWhenSelfDeleted);
   FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, OnResetSync);
+  FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, OnResetSyncWhenOffline);
   FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, ClientOnGetInitData);
   FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, OnSaveBookmarksBaseOrder);
-  FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, OnCompactComplete);
   FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, OnGetInitData);
   FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, OnSyncPrefsChanged);
   FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, OnSyncDebug);
@@ -151,6 +160,15 @@ class BraveProfileSyncServiceImpl
   FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest,
                            GetDevicesWithFetchSyncRecords);
   FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, SendCompact);
+  FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, SetSyncEnabled);
+  FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, SetSyncDisabled);
+  FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, IsSyncReadyOnNewProfile);
+  FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, SetThisDeviceCreatedTime);
+  FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, InitialFetchesStartWithZero);
+  FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest, DeviceIdV2Migration);
+  FRIEND_TEST_ALL_PREFIXES(::BraveSyncServiceTest,
+                           DeviceIdV2MigrationDupDeviceId);
+
   friend class ::BraveSyncServiceTest;
 
   void SignalWaitableEvent();
@@ -160,9 +178,11 @@ class BraveProfileSyncServiceImpl
                         int max_records);
   void FetchDevices();
   void SendCreateDevice();
+  void SendDeleteDevice();
   void SendDeviceSyncRecord(const int action,
                             const std::string& device_name,
                             const std::string& device_id,
+                            const std::string& device_id_v2,
                             const std::string& object_id);
   void OnResolvedPreferences(const brave_sync::RecordsList& records);
   void OnBraveSyncPrefsChanged(const std::string& pref);
@@ -171,8 +191,6 @@ class BraveProfileSyncServiceImpl
   void NotifyHaveSyncWords(const std::string& sync_words);
 
   void ResetSyncInternal();
-  void ForceCompleteReset();
-  bool GetResettingForTest() const { return reseting_; }
 
   void SetPermanentNodesOrder(const std::string& base_order);
 
@@ -189,13 +207,13 @@ class BraveProfileSyncServiceImpl
   std::unique_ptr<SyncRecordAndExistingList> PrepareResolvedPreferences(
       const RecordsList& records);
 
-  void SendAndPurgePendingRecords();
-
   void SendSyncRecords(const std::string& category_name,
                        RecordsListPtr records);
   void ResendSyncRecords(const std::string& category_name);
 
   void RecordSyncStateP3A() const;
+
+  bool IsSQSReady() const;
 
   static base::TimeDelta GetRetryExponentialWaitAmount(int retry_number);
   static std::vector<unsigned> GetExponentialWaitsForTests();
@@ -207,19 +225,19 @@ class BraveProfileSyncServiceImpl
   }
 
   std::unique_ptr<brave_sync::prefs::Prefs> brave_sync_prefs_;
-  // True when is in active sync chain
-  bool brave_sync_configured_ = false;
 
   // True if we have received SyncReady from JS lib
-  bool brave_sync_initialized_ = false;
+  // This is used only to prevent out of sequence invocation of OnSaveInitData
+  // and prevent double invocation of OnSyncReady
+  bool brave_sync_ready_ = false;
 
   // Prevent two sequential calls OnSetupSyncHaveCode or OnSetupSyncNewToSync
   // while being initializing
   bool brave_sync_initializing_ = false;
 
-  bool reseting_ = false;
+  bool send_device_id_v2_update_ = false;
 
-  std::string brave_sync_words_;
+  Uint8Array seed_;
 
   brave_sync::GetRecordsCallback get_record_cb_;
   base::WaitableEvent* wevent_ = nullptr;
@@ -231,9 +249,11 @@ class BraveProfileSyncServiceImpl
 
   std::unique_ptr<BraveSyncClient> brave_sync_client_;
 
-  base::Time chain_created_time_;
-  std::vector<RecordsListPtr> pending_send_records_;
   std::unique_ptr<RecordsList> pending_received_records_;
+  // Time when current device sent CREATE device record
+  base::Time this_device_created_time_;
+
+  bool pending_self_reset_ = false;
 
   // Used to ensure that certain operations are performed on the sequence that
   // this object was created on.

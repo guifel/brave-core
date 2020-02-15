@@ -7,6 +7,7 @@
 #define BRAVE_COMPONENTS_BRAVE_ADS_BROWSER_ADS_SERVICE_IMPL_H_
 
 #include <stdint.h>
+#include <deque>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -26,7 +27,9 @@
 #include "chrome/browser/notifications/notification_handler.h"
 #include "components/history/core/browser/history_service_observer.h"
 #include "components/prefs/pref_change_registrar.h"
-#include "mojo/public/cpp/bindings/associated_binding.h"
+#include "mojo/public/cpp/bindings/associated_receiver.h"
+#include "mojo/public/cpp/bindings/associated_remote.h"
+#include "mojo/public/cpp/bindings/remote.h"
 #include "ui/base/idle/idle.h"
 
 using brave_rewards::RewardsNotificationService;
@@ -67,6 +70,9 @@ class AdsServiceImpl : public AdsService,
   void SetEnabled(
       const bool is_enabled) override;
 
+  void SetAllowAdConversionTracking(
+      const bool should_allow) override;
+
   void SetAdsPerHour(
       const uint64_t ads_per_hour) override;
 
@@ -93,6 +99,8 @@ class AdsServiceImpl : public AdsService,
       const SessionID& tab_id) override;
 
   void GetAdsHistory(
+      const uint64_t from_timestamp,
+      const uint64_t to_timestamp,
       OnGetAdsHistoryCallback callback) override;
 
   void ToggleAdThumbUp(
@@ -126,6 +134,8 @@ class AdsServiceImpl : public AdsService,
 
   // AdsClient implementation
   bool IsEnabled() const override;
+
+  bool ShouldAllowAdConversionTracking() const override;
 
   uint64_t GetAdsPerHour() const override;
   uint64_t GetAdsPerDay() const override;
@@ -193,6 +203,9 @@ class AdsServiceImpl : public AdsService,
       const std::string& id);
   void ResetTheWholeState(const base::Callback<void(bool)>& callback) override;
 
+  void SetAdsServiceForNotificationHandler();
+  void ClearAdsServiceForNotificationHandler();
+
   void OpenNewTabWithUrl(
       const std::string& url);
 
@@ -205,14 +218,19 @@ class AdsServiceImpl : public AdsService,
       ads::URLRequestCallback callback,
       const std::unique_ptr<std::string> response_body);
 
-  void OnGetAdsForCategory(
+  void OnGetAdsForCategories(
       const ads::OnGetAdsCallback& callback,
-      const std::string& category,
+      const std::vector<std::string>& categories,
       const std::vector<ads::AdInfo>& ads);
+
+  void OnGetAdConversions(
+      const ads::OnGetAdConversionsCallback& callback,
+      const std::string& url,
+      const std::vector<ads::AdConversionTrackingInfo>& ad_conversions);
 
   void OnGetAdsHistory(
       OnGetAdsHistoryCallback callback,
-      const base::flat_map<uint64_t, std::vector<std::string>>& json);
+      const std::string& json);
 
   void OnRemoveAllHistory(
       const int32_t result);
@@ -270,6 +288,7 @@ class AdsServiceImpl : public AdsService,
   void MigratePrefsVersion3To4();
   void MigratePrefsVersion4To5();
   void MigratePrefsVersion5To6();
+  void MigratePrefsVersion6To7();
   int GetPrefsVersion() const;
 
   bool IsUpgradingFromPreBraveAdsBuild();
@@ -410,8 +429,12 @@ class AdsServiceImpl : public AdsService,
       ads::OnSaveCallback callback) override;
 
   void GetAds(
-      const std::string& category,
+      const std::vector<std::string>& categories,
       ads::OnGetAdsCallback callback) override;
+
+  void GetAdConversions(
+      const std::string& url,
+      ads::OnGetAdConversionsCallback callback) override;
 
   void EventLog(
       const std::string& json) const override;
@@ -459,12 +482,15 @@ class AdsServiceImpl : public AdsService,
 
   std::unique_ptr<BundleStateDatabase> bundle_state_backend_;
 
+  std::deque<std::string> notifications_;
+
   NotificationDisplayService* display_service_;  // NOT OWNED
   brave_rewards::RewardsService* rewards_service_;  // NOT OWNED
 
-  mojo::AssociatedBinding<bat_ads::mojom::BatAdsClient> bat_ads_client_binding_;
-  bat_ads::mojom::BatAdsAssociatedPtr bat_ads_;
-  bat_ads::mojom::BatAdsServicePtr bat_ads_service_;
+  mojo::AssociatedReceiver<bat_ads::mojom::BatAdsClient>
+      bat_ads_client_receiver_;
+  mojo::AssociatedRemote<bat_ads::mojom::BatAds> bat_ads_;
+  mojo::Remote<bat_ads::mojom::BatAdsService> bat_ads_service_;
 
   DISALLOW_COPY_AND_ASSIGN(AdsServiceImpl);
 };

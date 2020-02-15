@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include <limits>
+
 #import "BATBraveAds.h"
 #import "BATAdsNotification.h"
 #import "BATBraveLedger.h"
@@ -17,14 +19,18 @@
 #import <Network/Network.h>
 #import <UIKit/UIKit.h>
 
+#import "base/strings/sys_string_conversions.h"
+
 #define BATClassAdsBridge(__type, __objc_getter, __objc_setter, __cpp_var) \
   + (__type)__objc_getter { return ads::__cpp_var; } \
   + (void)__objc_setter:(__type)newValue { ads::__cpp_var = newValue; }
 
+static const NSInteger kDefaultAllowAdConversionTracking = YES;
 static const NSInteger kDefaultNumberOfAdsPerDay = 20;
 static const NSInteger kDefaultNumberOfAdsPerHour = 2;
 
 static NSString * const kAdsEnabledPrefKey = @"BATAdsEnabled";
+static NSString * const kShouldAllowAdConversionTrackingPrefKey = @"BATShouldAllowAdConversionTracking";
 static NSString * const kNumberOfAdsPerDayKey = @"BATNumberOfAdsPerDay";
 static NSString * const kNumberOfAdsPerHourKey = @"BATNumberOfAdsPerHour";
 
@@ -59,6 +65,7 @@ static NSString * const kNumberOfAdsPerHourKey = @"BATNumberOfAdsPerHour";
     self.prefs = [[NSMutableDictionary alloc] initWithContentsOfFile:[self prefsPath]];
     if (!self.prefs) {
       self.prefs = [[NSMutableDictionary alloc] init];
+      self.allowAdConversionTracking = kDefaultAllowAdConversionTracking;
       self.numberOfAllowableAdsPerDay = kDefaultNumberOfAdsPerDay;
       self.numberOfAllowableAdsPerHour = kDefaultNumberOfAdsPerHour;
     }
@@ -105,7 +112,7 @@ static NSString * const kNumberOfAdsPerHourKey = @"BATNumberOfAdsPerHour";
 
 + (BOOL)isCurrentLocaleSupported
 {
-  return [self isSupportedLocale:[NSLocale currentLocale].localeIdentifier];
+  return [self isSupportedLocale:[[NSLocale preferredLanguages] firstObject]];
 }
 
 BATClassAdsBridge(BOOL, isDebug, setDebug, _is_debug)
@@ -165,6 +172,17 @@ BATClassAdsBridge(BOOL, isTesting, setTesting, _is_testing)
   } else {
     [self shutdown];
   }
+}
+
+- (BOOL)shouldAllowAdConversionTracking
+{
+  return [(NSNumber *)self.prefs[kShouldAllowAdConversionTrackingPrefKey] boolValue];
+}
+
+- (void)setAllowAdConversionTracking:(BOOL)shouldAllowAdConversionTracking
+{
+  self.prefs[kShouldAllowAdConversionTrackingPrefKey] = @(shouldAllowAdConversionTracking);
+  [self savePrefs];
 }
 
 - (NSInteger)numberOfAllowableAdsPerDay
@@ -253,13 +271,51 @@ BATClassAdsBridge(BOOL, isTesting, setTesting, _is_testing)
   ads->OnBackground();
 }
 
+#pragma mark - History
+
+- (NSArray<NSDate *> *)getAdsHistoryDates
+{
+  if (![self isAdsServiceRunning]) { return @[]; }
+  const uint64_t from_timestamp = 0;
+  const uint64_t to_timestamp = std::numeric_limits<uint64_t>::max();
+
+  const auto history = ads->GetAdsHistory(ads::AdsHistory::FilterType::kNone,
+      ads::AdsHistory::SortType::kNone, from_timestamp, to_timestamp);
+
+  const auto dates = [[NSMutableArray<NSDate *> alloc] init];
+  for (const auto& entry : history.entries) {
+    const auto date = [NSDate dateWithTimeIntervalSince1970:
+        entry.timestamp_in_seconds];
+    [dates addObject:date];
+  }
+
+  return dates;
+}
+- (BOOL)hasViewedAdsInPreviousCycle
+{
+  const auto calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
+  const auto now = NSDate.date;
+  const auto previousCycleDate = [calendar dateByAddingUnit:NSCalendarUnitMonth value:-1 toDate:now options:0];
+  const auto previousCycleMonth = [calendar component:NSCalendarUnitMonth fromDate:previousCycleDate];
+  const auto previousCycleYear = [calendar component:NSCalendarUnitYear fromDate:previousCycleDate];
+  const auto viewedDates = [self getAdsHistoryDates];
+  for (NSDate *date in viewedDates) {
+    const auto components = [calendar components:NSCalendarUnitMonth|NSCalendarUnitYear fromDate:date];
+    if (components.month == previousCycleMonth && components.year == previousCycleYear) {
+      // Was from previous cycle
+      return YES;
+    }
+  }
+  return NO;
+}
+
 #pragma mark - Reporting
 
-- (void)reportLoadedPageWithURL:(NSURL *)url html:(NSString *)html
+- (void)reportLoadedPageWithURL:(NSURL *)url innerText:(NSString *)text
 {
   if (![self isAdsServiceRunning]) { return; }
-  const auto urlString = std::string(url.absoluteString.UTF8String);
-  ads->OnPageLoaded(urlString, std::string(html.UTF8String));
+  const auto urlString = base::SysNSStringToUTF8(url.absoluteString);
+  ads->OnPageLoaded(urlString, base::SysNSStringToUTF8(text));
 }
 
 - (void)reportMediaStartedWithTabId:(NSInteger)tabId
@@ -323,16 +379,29 @@ BATClassAdsBridge(BOOL, isTesting, setTesting, _is_testing)
                         type:[NSString stringWithUTF8String:std::string(type).c_str()]];
 }
 
-- (void)getAds:(const std::string &)category callback:(ads::OnGetAdsCallback)callback
+- (void)getAds:(const std::vector<std::string> &)categories callback:(ads::OnGetAdsCallback)callback
 {
   if (![self isAdsServiceRunning]) { return; }
-  auto categories = bundleState->categories.find(category);
-  if (categories == bundleState->categories.end()) {
-    callback(ads::Result::FAILED, category, {});
-    return;
+
+  std::vector<ads::AdInfo> found_ads;
+  for (const auto & category : categories) {
+    auto it = bundleState->categories.find(category);
+    if (it == bundleState->categories.end()) {
+      continue;
+    }
+
+    found_ads.insert(found_ads.end(), it->second.begin(), it->second.end());
   }
 
-  callback(ads::Result::SUCCESS, category, categories->second);
+  callback(ads::Result::SUCCESS, categories, found_ads);
+}
+
+- (void)getAdConversions:(const std::string &)url callback:(ads::OnGetAdConversionsCallback)callback
+{
+  // TODO(khickinson): To be implemented
+  if (![self isAdsServiceRunning]) { return; }
+
+  callback(ads::Result::SUCCESS, url, {});
 }
 
 - (void)setCatalogIssuers:(std::unique_ptr<ads::IssuersInfo>)info

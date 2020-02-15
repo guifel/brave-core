@@ -109,6 +109,18 @@ public class BravePrefServiceBridge {
         BravePrefServiceBridgeJni.get().setSafetynetCheckFailed(value);
     }
 
+    public boolean getSafetynetCheckFailed() {
+        return BravePrefServiceBridgeJni.get().getSafetynetCheckFailed();
+    }
+
+    public void setUseRewardsStagingServer(boolean enabled) {
+        BravePrefServiceBridgeJni.get().setUseRewardsStagingServer(enabled);
+    }
+
+    public boolean getUseRewardsStagingServer() {
+        return BravePrefServiceBridgeJni.get().getUseRewardsStagingServer();
+    }
+
     @NativeMethods
     interface Natives {
         void setHTTPSEEnabled(boolean enabled);
@@ -137,5 +149,9 @@ public class BravePrefServiceBridge {
         String getSyncSeed();
 
         void setSafetynetCheckFailed(boolean value);
+        boolean getSafetynetCheckFailed();
+
+        void setUseRewardsStagingServer(boolean enabled);
+        boolean getUseRewardsStagingServer();
     }
 }

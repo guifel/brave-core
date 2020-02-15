@@ -26,13 +26,12 @@
 #include "chrome/common/chrome_switches.h"
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/autofill/core/common/autofill_payments_features.h"
+#include "components/feed/feed_feature_list.h"
 #include "components/omnibox/common/omnibox_features.h"
 #include "components/password_manager/core/common/password_manager_features.h"
-#include "components/unified_consent/feature.h"
 #include "components/sync/driver/sync_driver_switches.h"
 #include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
-#include "extensions/common/extension_features.h"
 #include "services/network/public/cpp/features.h"
 #include "third_party/widevine/cdm/buildflags.h"
 #include "ui/base/ui_base_features.h"
@@ -145,45 +144,46 @@ bool BraveMainDelegate::BasicStartupComplete(int* exit_code) {
       switches::kExtensionContentVerificationEnforceStrict);
   command_line.AppendSwitchASCII(switches::kExtensionsInstallVerification,
       "enforce");
-  // Otherwise BaseMark Web 3.0 suffers and it seems to be highly enabled
-  // by field trials in Chrome.
-  command_line.AppendSwitchASCII(switches::kEnableOopRasterization,
-      "Enabled");
 
   // Brave's sync protocol does not use the sync service url
   command_line.AppendSwitchASCII(switches::kSyncServiceURL,
                                  "https://no-thanks.invalid");
 
+  command_line.AppendSwitch(switches::kDisableDatabases);
+
   // Enabled features.
   const std::unordered_set<const char*> enabled_features = {
-#if BUILDFLAG(ENABLE_EXTENSIONS)
-      extensions_features::kNewExtensionUpdaterService.name,
-#endif
       password_manager::features::kPasswordImport.name,
     // Enable webui dark theme: @media (prefers-color-scheme: dark) is gated on
     // this feature.
       features::kWebUIDarkMode.name,
       omnibox::kSimplifyHttpsIndicator.name,
+      features::kDnsOverHttps.name,
   };
 
   // Disabled features.
   const std::unordered_set<const char*> disabled_features = {
       autofill::features::kAutofillServerCommunication.name,
+      features::kAllowPopupsDuringPageUnload.name,
       features::kAudioServiceOutOfProcess.name,
       features::kLookalikeUrlNavigationSuggestionsUI.name,
       features::kNotificationTriggers.name,
       features::kSmsReceiver.name,
-      unified_consent::kUnifiedConsent.name,
-      switches::kSyncUSSBookmarks.name,
+      features::kVideoPlaybackQuality.name,
+      features::kWebXr.name,
+      features::kWebXrGamepadModule.name,
+#if defined(OS_ANDROID)
+      feed::kInterestFeedContentSuggestions.name,
+#endif
   };
   command_line.AppendFeatures(enabled_features, disabled_features);
 
   bool ret = ChromeMainDelegate::BasicStartupComplete(exit_code);
 
 #if BUILDFLAG(BUNDLE_WIDEVINE_CDM)
-  // Override chrome::FILE_WIDEVINE_CDM path because we install it in user data
-  // dir. Must call after ChromeMainDelegate::BasicStartupComplete() to use
-  // chrome paths.
+  // Override chrome::DIR_BUNDLED_WIDEVINE_CDM path because we install it in
+  // user data dir. Must call after ChromeMainDelegate::BasicStartupComplete()
+  // to use chrome paths.
   brave::OverridePath();
 #endif
 

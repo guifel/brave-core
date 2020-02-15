@@ -3,16 +3,42 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "brave/components/brave_shields/common/features.h"
+#include "brave/components/brave_sync/features.h"
+#include "brave/components/ntp_sponsored_images/browser/features.h"
+#include "chrome/browser/about_flags.h"
+
+using brave_shields::features::kBraveAdblockCosmeticFiltering;
+using brave_sync::features::kBraveSync;
+using ntp_sponsored_images::features::kBraveNTPBrandedWallpaper;
+using ntp_sponsored_images::features::kBraveNTPBrandedWallpaperDemo;
+
+#define BRAVE_FEATURE_ENTRIES \
+    {"brave-ntp-branded-wallpaper",                                        \
+     flag_descriptions::kBraveNTPBrandedWallpaperName,                     \
+     flag_descriptions::kBraveNTPBrandedWallpaperDescription, kOsAll,      \
+     FEATURE_VALUE_TYPE(kBraveNTPBrandedWallpaper)},                       \
+    {"brave-ntp-branded-wallpaper-demo",                                   \
+     flag_descriptions::kBraveNTPBrandedWallpaperDemoName,                 \
+     flag_descriptions::kBraveNTPBrandedWallpaperDemoDescription, kOsAll,  \
+     FEATURE_VALUE_TYPE(kBraveNTPBrandedWallpaperDemo)},                   \
+    {"brave-adblock-cosmetic-filtering",                                   \
+     flag_descriptions::kBraveAdblockCosmeticFilteringName,                \
+     flag_descriptions::kBraveAdblockCosmeticFilteringDescription, kOsAll, \
+     FEATURE_VALUE_TYPE(kBraveAdblockCosmeticFiltering)},                  \
+    {"brave-sync",                                                         \
+     flag_descriptions::kBraveSyncName,                                    \
+     flag_descriptions::kBraveSyncDescription, kOsDesktop,                 \
+     FEATURE_VALUE_TYPE(kBraveSync)},
+
 #define SetFeatureEntryEnabled SetFeatureEntryEnabled_ChromiumImpl
-#include "../../../../chrome/browser/about_flags.cc"       // NOLINT
-#include "../../../../components/flags_ui/flags_state.cc"  // NOLINT
+#include "../../../../chrome/browser/about_flags.cc"  // NOLINT
 #undef SetFeatureEntryEnabled
 
 #include "base/strings/string_util.h"
 #include "brave/common/pref_names.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
-#include "components/flags_ui/flags_state.h"
 #include "components/prefs/pref_service.h"
 
 namespace about_flags {

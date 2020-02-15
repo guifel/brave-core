@@ -18,6 +18,10 @@
       <!-- TODO: move to brave_adblock_ui component -->
       <include name="IDR_BRAVE_ADBLOCK_HTML" file="../brave_adblock_ui/brave_adblock.html" type="BINDATA" />
 
+      <!-- WebUI webcompat reporter resources -->
+      <!-- TODO: move to webcompat_reporter_ui component -->
+      <include name="IDR_WEBCOMPAT_REPORTER_HTML" file="../webcompat_reporter/ui/webcompat_reporter.html" type="BINDATA" />
+
       <!-- WebUI welcome page resources -->
       <!-- TODO: move to brave_welcome_ui component -->
       <include name="IDR_BRAVE_WELCOME_HTML" file="../brave_welcome_ui/brave_welcome.html" type="BINDATA" />
@@ -35,27 +39,37 @@
       <include name="IDR_BRAVE_WALLET_HTML" file="../brave_wallet_ui/brave_wallet.html" type="BINDATA" />
 
       <!-- Imagery links -->
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND1" file="../img/newtab/ntp-1.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND2" file="../img/newtab/ntp-2.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND3" file="../img/newtab/ntp-3.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND4" file="../img/newtab/ntp-4.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND5" file="../img/newtab/ntp-5.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND6" file="../img/newtab/ntp-6.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND7" file="../img/newtab/ntp-7.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND8" file="../img/newtab/ntp-8.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND9" file="../img/newtab/ntp-9.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND10" file="../img/newtab/ntp-10.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND11" file="../img/newtab/ntp-11.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND12" file="../img/newtab/ntp-12.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND13" file="../img/newtab/ntp-13.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND14" file="../img/newtab/ntp-14.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND15" file="../img/newtab/ntp-15.webp" type="BINDATA" />
-      <include name="IDR_BRAVE_NEW_TAB_BACKGROUND16" file="../img/newtab/ntp-16.webp" type="BINDATA" />
-      
+      <if expr="not is_android">
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND1" file="../img/newtab/ntp-1.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND2" file="../img/newtab/ntp-2.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND3" file="../img/newtab/ntp-3.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND4" file="../img/newtab/ntp-4.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND5" file="../img/newtab/ntp-5.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND6" file="../img/newtab/ntp-6.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND7" file="../img/newtab/ntp-7.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND8" file="../img/newtab/ntp-8.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND9" file="../img/newtab/ntp-9.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND10" file="../img/newtab/ntp-10.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND11" file="../img/newtab/ntp-11.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND12" file="../img/newtab/ntp-12.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND13" file="../img/newtab/ntp-13.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND14" file="../img/newtab/ntp-14.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND15" file="../img/newtab/ntp-15.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_BACKGROUND16" file="../img/newtab/ntp-16.webp" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_DUMMY_BRANDED_WALLPAPER_BG_1" file="../img/newtab/dummy-branded-wallpaper/background-1.jpg" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_DUMMY_BRANDED_WALLPAPER_BG_2" file="../img/newtab/dummy-branded-wallpaper/background-2.jpg" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_DUMMY_BRANDED_WALLPAPER_BG_3" file="../img/newtab/dummy-branded-wallpaper/background-3.jpg" type="BINDATA" />
+        <include name="IDR_BRAVE_NEW_TAB_DUMMY_BRANDED_WALLPAPER_LOGO" file="../img/newtab/dummy-branded-wallpaper/logo.png" type="BINDATA" />
+      </if>
+
       <!-- WebUI private new tab resources -->
       <!-- TODO: move to brave_new_tab_ui component -->
       <include name="IDR_BRAVE_PRIVATE_TAB_IMG" file="../img/newtab/private-window.svg" type="BINDATA" />
       <include name="IDR_BRAVE_PRIVATE_TAB_TOR_IMG" file="../img/newtab/private-window-tor.svg" type="BINDATA" />
+
+      <if expr="enable_brave_perf_predictor">
+        <part file="../brave_perf_predictor/resources/brave_perf_predictor_resources.grdp" />
+      </if>
     </includes>
   </release>
 </grit>

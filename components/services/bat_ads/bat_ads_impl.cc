@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include <map>
 #include <utility>
 #include <vector>
 
@@ -14,7 +13,6 @@
 #include "bat/ads/category_content.h"
 #include "bat/ads/confirmation_type.h"
 #include "brave/components/services/bat_ads/bat_ads_client_mojo_bridge.h"
-#include "mojo/public/cpp/bindings/map.h"
 
 using std::placeholders::_1;
 
@@ -43,7 +41,8 @@ ads::CategoryContent::OptAction ToAdsOptAction(
 
 }  // namespace
 
-BatAdsImpl::BatAdsImpl(mojom::BatAdsClientAssociatedPtrInfo client_info) :
+BatAdsImpl::BatAdsImpl(
+    mojo::PendingAssociatedRemote<mojom::BatAdsClient> client_info) :
     bat_ads_client_mojo_proxy_(new BatAdsClientMojoBridge(
         std::move(client_info))),
     ads_(ads::Ads::CreateInstance(bat_ads_client_mojo_proxy_.get())) {
@@ -156,19 +155,15 @@ void BatAdsImpl::RemoveAllHistory(
 }
 
 void BatAdsImpl::GetAdsHistory(
+    const uint64_t from_timestamp,
+    const uint64_t to_timestamp,
     GetAdsHistoryCallback callback) {
-  std::map<uint64_t, std::vector<std::string>> result;
+  ads::AdsHistory history = ads_->GetAdsHistory(
+      ads::AdsHistory::FilterType::kConfirmationType,
+          ads::AdsHistory::SortType::kDescendingOrder, from_timestamp,
+              to_timestamp);
 
-  auto ads_history_map = ads_->GetAdsHistory();
-  for (const auto& entry : ads_history_map) {
-    std::vector<std::string> ads_history;
-    for (const auto& ads_history_entry : entry.second) {
-      ads_history.push_back(ads_history_entry.ToJson());
-    }
-    result[entry.first] = ads_history;
-  }
-
-  std::move(callback).Run(mojo::MapToFlatMap(result));
+  std::move(callback).Run(history.ToJson());
 }
 
 void BatAdsImpl::ToggleAdThumbUp(

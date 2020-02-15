@@ -67,7 +67,7 @@ class MockConfirmationsClient : public ConfirmationsClient {
   MOCK_METHOD4(OnReconcileComplete, void(
       Result result,
       const std::string& viewing_id,
-      const std::string& probi,
+      const double amount,
       const ledger::RewardsType type));
 
   MOCK_METHOD1(LoadLedgerState, void(
@@ -121,30 +121,13 @@ class MockConfirmationsClient : public ConfirmationsClient {
       ledger::ActivityInfoFilterPtr filter,
       ledger::PublisherInfoListCallback callback));
 
-  MOCK_METHOD2(FetchGrants, void(
-      const std::string& lang,
-      const std::string& paymentId));
+  MOCK_METHOD0(FetchPromotions, void());
 
-  MOCK_METHOD2(OnGrant, void(
+  MOCK_METHOD1(ClaimPromotion, void(const std::string& promotion_id));
+
+  MOCK_METHOD2(OnRecoverWallet, void(
       ledger::Result result,
-      ledger::GrantPtr grant));
-
-  MOCK_METHOD2(GetGrantCaptcha, void(
-      const std::string& promotion_id,
-      const std::string& promotion_type));
-
-  MOCK_METHOD2(OnGrantCaptcha, void(
-      const std::string& image,
-      const std::string& hint));
-
-  MOCK_METHOD3(OnRecoverWallet, void(
-      ledger::Result result,
-      double balance,
-      std::vector<ledger::GrantPtr> grants));
-
-  MOCK_METHOD2(OnGrantFinish, void(
-      ledger::Result result,
-      ledger::GrantPtr grant));
+      double balance));
 
   MOCK_METHOD3(OnPanelPublisherInfo, void(
       ledger::Result result,
@@ -156,16 +139,12 @@ class MockConfirmationsClient : public ConfirmationsClient {
       const std::string& favicon_key,
       ledger::FetchIconCallback callback));
 
-  MOCK_METHOD6(SaveContributionInfo, void(
-      const std::string& probi,
-      const ledger::ActivityMonth month,
-      const int year,
-      const uint32_t date,
-      const std::string& publisher_key,
-      const ledger::RewardsType type));
+  MOCK_METHOD2(SaveContributionInfo, void(
+      ledger::ContributionInfoPtr info,
+      ledger::ResultCallback callback));
 
   MOCK_METHOD2(SaveRecurringTip, void(
-      ledger::ContributionInfoPtr info,
+      ledger::RecurringTipPtr info,
       ledger::SaveRecurringTipCallback callback));
 
   MOCK_METHOD1(GetRecurringTips, void(
@@ -177,10 +156,6 @@ class MockConfirmationsClient : public ConfirmationsClient {
   MOCK_METHOD2(RemoveRecurringTip, void(
       const std::string& publisher_key,
       ledger::RemoveRecurringTipCallback callback));
-
-  MOCK_METHOD2(OnGrantViaSafetynetCheck, void(
-      const std::string& promotion_id,
-      const std::string& nonce));
 
   MOCK_METHOD2(SetTimer, void(
       uint64_t time_offset,
@@ -245,10 +220,8 @@ class MockConfirmationsClient : public ConfirmationsClient {
   MOCK_METHOD1(GetPendingContributions, void(
       ledger::PendingContributionInfoListCallback callback));
 
-  MOCK_METHOD4(RemovePendingContribution, void(
-      const std::string& publisher_key,
-      const std::string& viewing_id,
-      uint64_t added_date,
+  MOCK_METHOD2(RemovePendingContribution, void(
+      const uint64_t id,
       ledger::RemovePendingContributionCallback callback));
 
   MOCK_METHOD1(RemoveAllPendingContributions, void(
@@ -370,6 +343,66 @@ class MockConfirmationsClient : public ConfirmationsClient {
 
   MOCK_METHOD1(GetFirstContributionQueue, void(
     ledger::GetFirstContributionQueueCallback callback));
+
+  MOCK_METHOD2(InsertOrUpdatePromotion, void(
+    ledger::PromotionPtr info,
+    ledger::ResultCallback callback));
+
+  MOCK_METHOD2(GetPromotion, void(
+    const std::string& id,
+    ledger::GetPromotionCallback callback));
+
+  MOCK_METHOD1(GetAllPromotions, void(
+    ledger::GetAllPromotionsCallback callback));
+
+  MOCK_METHOD2(InsertOrUpdateUnblindedToken, void(
+    ledger::UnblindedTokenPtr info,
+    ledger::ResultCallback callback));
+
+  MOCK_METHOD1(GetAllUnblindedTokens, void(
+    ledger::GetAllUnblindedTokensCallback callback));
+
+  MOCK_METHOD2(DeleteUnblindedTokens, void(
+    const std::vector<std::string>& id_list,
+    ledger::ResultCallback callback));
+
+  MOCK_METHOD2(DeleteUnblindedTokensForPromotion, void(
+    const std::string& promotion_id,
+    ledger::ResultCallback callback));
+
+  MOCK_METHOD0(GetClientInfo, ledger::ClientInfoPtr());
+
+  MOCK_METHOD0(UnblindedTokensReady, void());
+
+  MOCK_METHOD3(GetTransactionReport, void(
+      const ledger::ActivityMonth month,
+      const int year,
+      ledger::GetTransactionReportCallback callback));
+
+  MOCK_METHOD3(GetContributionReport, void(
+      const ledger::ActivityMonth month,
+      const int year,
+      ledger::GetContributionReportCallback callback));
+
+  MOCK_METHOD1(GetIncompleteContributions, void(
+      ledger::GetIncompleteContributionsCallback callback));
+
+  MOCK_METHOD2(GetContributionInfo, void(
+      const std::string& contribution_id,
+      ledger::GetContributionInfoCallback callback));
+
+  MOCK_METHOD4(UpdateContributionInfoStepAndCount, void(
+      const std::string& contribution_id,
+      const ledger::ContributionStep step,
+      const int32_t retry_count,
+      ledger::ResultCallback callback));
+
+  MOCK_METHOD3(UpdateContributionInfoContributedAmount, void(
+      const std::string& contribution_id,
+      const std::string& publisher_key,
+      ledger::ResultCallback callback));
+
+  MOCK_METHOD0(ReconcileStampReset, void());
 };
 
 }  // namespace confirmations

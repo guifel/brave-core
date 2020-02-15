@@ -11,6 +11,31 @@ const getWindowId = (id: number) => {
   return `id_${id}`
 }
 
+const updateBadgeTextAllWindows = (windows: chrome.windows.Window[], state?: RewardsExtension.State) => {
+  if (!state || windows.length === 0) {
+    return
+  }
+
+  windows.forEach((window => {
+    const id = getWindowId(window.id)
+    const publishers: Record<string, RewardsExtension.Publisher> = state.publishers
+    const publisher = publishers[id]
+
+    if (!publisher || !window.tabs) {
+      return
+    }
+
+    let tab = window.tabs.find((tab) => tab.active)
+
+    if (!tab) {
+      return
+    }
+
+    setBadgeText(state, isPublisherConnectedOrVerified(publisher.status), tab.id)
+  }))
+
+}
+
 export const rewardsPanelReducer = (state: RewardsExtension.State | undefined, action: any) => {
   if (state === undefined) {
     state = storage.load()
@@ -126,26 +151,9 @@ export const rewardsPanelReducer = (state: RewardsExtension.State | undefined, a
       }
       break
     }
-    case types.GET_WALLET_PROPERTIES:
-      chrome.braveRewards.getWalletProperties()
-      break
-    case types.ON_WALLET_PROPERTIES: {
-      state = {
-        ...state,
-        walletCreated: true,
-        walletCreateFailed: false,
-        walletCreating: false,
-        walletCorrupted: false,
-        walletProperties: payload.properties
-      }
-      break
-    }
-    case types.GET_CURRENT_REPORT:
-      chrome.braveRewards.getCurrentReport()
-      break
-    case types.ON_CURRENT_REPORT: {
+    case types.ON_BALANCE_REPORT: {
       state = { ...state }
-      state.report = payload.properties
+      state.balanceReport = payload.report
       break
     }
     case types.ON_NOTIFICATION_ADDED: {
@@ -219,12 +227,16 @@ export const rewardsPanelReducer = (state: RewardsExtension.State | undefined, a
         state.currentNotification = current
       }
 
+      if (state.currentNotification === undefined) {
+        updateBadgeTextAllWindows(payload.windows, state)
+      } else {
+        setBadgeText(state)
+      }
+
       state = {
         ...state,
         notifications
       }
-
-      setBadgeText(state)
       break
     }
     case types.INCLUDE_IN_AUTO_CONTRIBUTION: {
@@ -450,6 +462,32 @@ export const rewardsPanelReducer = (state: RewardsExtension.State | undefined, a
     case types.ON_EXTERNAL_WALLET: {
       state = { ...state }
       state.externalWallet = payload.wallet
+      break
+    }
+    case types.ON_ANON_WALLET_STATUS: {
+      state = { ...state }
+
+      state.walletCorrupted = false
+      state.walletCreating = false
+      state.walletCreated = false
+      state.walletCreateFailed = false
+
+      if (payload.result === RewardsExtension.Result.WALLET_CORRUPT) {
+        state.walletCorrupted = true
+      } else if (payload.result === RewardsExtension.Result.WALLET_CREATED) {
+        state.walletCreated = true
+      }
+      break
+    }
+    case types.ON_WALLET_PROPERTIES: {
+      state = {
+        ...state,
+        walletCreated: true,
+        walletCreateFailed: false,
+        walletCreating: false,
+        walletCorrupted: false,
+        walletProperties: payload.properties
+      }
       break
     }
   }

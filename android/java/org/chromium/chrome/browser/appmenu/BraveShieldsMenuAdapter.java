@@ -89,7 +89,6 @@ class BraveShieldsMenuAdapter extends BaseAdapter {
     private static final float ENTER_STANDARD_ITEM_OFFSET_X_DP = 10.f;
 
     private static final String BRAVE_SHIELDS_GREY = "#F2F2F2";
-    private static final String BRAVE_SHIELDS_BLACK = "#000000";
     private static final String BRAVE_SHIELDS_WHITE = "#FFFFFF";
     private static final String BRAVE_GROUP_TITLE_COLOR = "#6B6B6B";
     private static final String ADS_AND_TRACKERS_COLOR = "#FB542B";
@@ -210,7 +209,6 @@ class BraveShieldsMenuAdapter extends BaseAdapter {
                 if (0 == position) {
                     convertView = mInflater.inflate(R.layout.brave_shields_switcher, parent, false);
                     setupSwitchClick((Switch)convertView.findViewById(R.id.brave_shields_switch));
-                    convertView.setBackgroundColor(Color.parseColor(BRAVE_SHIELDS_GREY));
                 // We should set layouts for switch rows
                 } else if (1 == position || 2 == position || 8 == position || 14 == position) {
                     convertView = mInflater.inflate(R.layout.brave_shields_text_item, parent, false);
@@ -221,7 +219,8 @@ class BraveShieldsMenuAdapter extends BaseAdapter {
                         } else if (8 == position) {
                             text.setText(R.string.brave_shields_second_group_title);
                         } else if (1 == position) {
-                            text.setTextColor(Color.parseColor(BRAVE_SHIELDS_BLACK));
+                            text.setTextColor(convertView.getContext().getResources().getColor(
+                                    R.color.standard_mode_tint));
                             text.setTextSize(20);
                             text.setText(mTitle);
                         } else {
@@ -311,14 +310,7 @@ class BraveShieldsMenuAdapter extends BaseAdapter {
                         String value = text.getText().toString().replaceFirst(" ", "\n");
                         text.setText(value);
                     }*/
-                } else {
-                    convertView = mInflater.inflate(R.layout.menu_item, parent, false);
-                    holder.text = (TextView) convertView.findViewById(R.id.menu_item_text);
-                    holder.image = (AppMenuItemIcon) convertView.findViewById(R.id.menu_item_icon);
-                    convertView.setTag(holder);
                 }
-                convertView.setTag(R.id.menu_item_enter_anim_id,
-                        buildStandardItemEnterAnimator(convertView, position));
 
                 mPositionViews.append(position, convertView);
             } else {
@@ -328,7 +320,7 @@ class BraveShieldsMenuAdapter extends BaseAdapter {
                 }
             }
 
-            if (null != holder.text && null != holder.image) {
+            if (null != holder.text) {
                 setupStandardMenuItemViewHolder(holder, convertView, item);
             }
         } else {
@@ -628,11 +620,6 @@ class BraveShieldsMenuAdapter extends BaseAdapter {
 
     private void setupStandardMenuItemViewHolder(StandardMenuItemViewHolder holder,
             View convertView, final MenuItem item) {
-        // Set up the icon.
-        Drawable icon = item.getIcon();
-        holder.image.setImageDrawable(icon);
-        holder.image.setVisibility(icon == null ? View.GONE : View.VISIBLE);
-        holder.image.setChecked(item.isChecked());
         holder.text.setText(item.getTitle());
         holder.text.setContentDescription(item.getTitleCondensed());
 
@@ -641,13 +628,6 @@ class BraveShieldsMenuAdapter extends BaseAdapter {
         holder.text.setEnabled(isEnabled);
         // This will ensure that the item is not highlighted when selected.
         convertView.setEnabled(isEnabled);
-
-        /*convertView.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mAppMenu.onItemClick(item);
-            }
-        });*/
     }
 
     /**
@@ -726,7 +706,6 @@ class BraveShieldsMenuAdapter extends BaseAdapter {
 
     static class StandardMenuItemViewHolder {
         public TextView text;
-        public AppMenuItemIcon image;
     }
 
     static class CustomMenuItemViewHolder extends StandardMenuItemViewHolder {

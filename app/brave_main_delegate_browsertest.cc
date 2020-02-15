@@ -13,12 +13,10 @@
 #include "components/autofill/core/common/autofill_payments_features.h"
 #include "components/omnibox/common/omnibox_features.h"
 #include "components/password_manager/core/common/password_manager_features.h"
-#include "components/sync/driver/sync_driver_switches.h"
-#include "components/unified_consent/feature.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/common/content_features.h"
+#include "content/public/common/content_switches.h"
 #include "content/public/common/web_preferences.h"
-#include "extensions/common/extension_features.h"
 #include "gpu/config/gpu_finch_features.h"
 #include "services/network/public/cpp/features.h"
 
@@ -42,16 +40,22 @@ IN_PROC_BROWSER_TEST_F(BraveMainDelegateBrowserTest, DisableHyperlinkAuditing) {
   EXPECT_FALSE(prefs.hyperlink_auditing_enabled);
 }
 
+IN_PROC_BROWSER_TEST_F(BraveMainDelegateBrowserTest, DisableWebSQL) {
+  EXPECT_TRUE(base::CommandLine::ForCurrentProcess()->HasSwitch(
+      switches::kDisableDatabases));
+}
+
 IN_PROC_BROWSER_TEST_F(BraveMainDelegateBrowserTest, DisabledFeatures) {
   const base::Feature* disabled_features[] = {
       &autofill::features::kAutofillServerCommunication,
+      &features::kAllowPopupsDuringPageUnload,
       &features::kAudioServiceOutOfProcess,
-      &features::kDefaultEnableOopRasterization,
       &features::kNotificationTriggers,
       &features::kSmsReceiver,
-      &unified_consent::kUnifiedConsent,
+      &features::kVideoPlaybackQuality,
+      &features::kWebXr,
+      &features::kWebXrGamepadModule,
       &features::kLookalikeUrlNavigationSuggestionsUI,
-      &switches::kSyncUSSBookmarks,
   };
 
   for (const auto* feature : disabled_features)
@@ -60,9 +64,6 @@ IN_PROC_BROWSER_TEST_F(BraveMainDelegateBrowserTest, DisabledFeatures) {
 
 IN_PROC_BROWSER_TEST_F(BraveMainDelegateBrowserTest, EnabledFeatures) {
   const base::Feature* enabled_features[] = {
-#if BUILDFLAG(ENABLE_EXTENSIONS)
-    &extensions_features::kNewExtensionUpdaterService,
-#endif
     &omnibox::kSimplifyHttpsIndicator,
     &password_manager::features::kPasswordImport,
   };

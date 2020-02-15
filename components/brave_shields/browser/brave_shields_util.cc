@@ -10,6 +10,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "brave/browser/brave_browser_process_impl.h"
 #include "brave/common/shield_exceptions.h"
+#include "brave/components/brave_perf_predictor/browser/buildflags.h"
 #include "brave/components/brave_shields/browser/brave_shields_p3a.h"
 #include "brave/components/brave_shields/browser/brave_shields_web_contents_observer.h"
 #include "brave/components/brave_shields/browser/referrer_whitelist_service.h"
@@ -22,6 +23,10 @@
 #include "content/public/common/referrer.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "url/gurl.h"
+
+#if BUILDFLAG(ENABLE_BRAVE_PERF_PREDICTOR)
+#include "brave/components/brave_perf_predictor/browser/perf_predictor_tab_helper.h"
+#endif
 
 using content::Referrer;
 
@@ -120,7 +125,7 @@ void SetBraveShieldsEnabled(Profile* profile,
   HostContentSettingsMapFactory::GetForProfile(profile)
       ->SetContentSettingCustomScope(
           primary_pattern, ContentSettingsPattern::Wildcard(),
-          CONTENT_SETTINGS_TYPE_PLUGINS, kBraveShields,
+          ContentSettingsType::PLUGINS, kBraveShields,
           // this is 'allow_brave_shields' so 'enable' == 'allow'
           enable ? CONTENT_SETTING_ALLOW : CONTENT_SETTING_BLOCK);
 
@@ -140,7 +145,7 @@ void ResetBraveShieldsEnabled(Profile* profile,
   HostContentSettingsMapFactory::GetForProfile(profile)
       ->SetContentSettingCustomScope(
           primary_pattern, ContentSettingsPattern::Wildcard(),
-          CONTENT_SETTINGS_TYPE_PLUGINS, kBraveShields,
+          ContentSettingsType::PLUGINS, kBraveShields,
           CONTENT_SETTING_DEFAULT);
 }
 
@@ -149,7 +154,7 @@ bool GetBraveShieldsEnabled(HostContentSettingsMap* map, const GURL& url) {
     return false;
 
   ContentSetting setting = map->GetContentSetting(
-      url, GURL(), CONTENT_SETTINGS_TYPE_PLUGINS, kBraveShields);
+      url, GURL(), ContentSettingsType::PLUGINS, kBraveShields);
 
   // see EnableBraveShields - allow and default == true
   return setting == CONTENT_SETTING_BLOCK ? false : true;
@@ -171,13 +176,13 @@ void SetAdControlType(Profile* profile, ControlType type, const GURL& url) {
   HostContentSettingsMapFactory::GetForProfile(profile)
       ->SetContentSettingCustomScope(primary_pattern,
                                      ContentSettingsPattern::Wildcard(),
-                                     CONTENT_SETTINGS_TYPE_PLUGINS, kAds,
+                                     ContentSettingsType::PLUGINS, kAds,
                                      GetDefaultBlockFromControlType(type));
 
   HostContentSettingsMapFactory::GetForProfile(profile)
       ->SetContentSettingCustomScope(primary_pattern,
                                      ContentSettingsPattern::Wildcard(),
-                                     CONTENT_SETTINGS_TYPE_PLUGINS, kTrackers,
+                                     ContentSettingsType::PLUGINS, kTrackers,
                                      GetDefaultBlockFromControlType(type));
   RecordShieldsSettingChanged();
 }
@@ -185,13 +190,13 @@ void SetAdControlType(Profile* profile, ControlType type, const GURL& url) {
 ControlType GetAdControlType(Profile* profile, const GURL& url) {
   ContentSetting setting =
       HostContentSettingsMapFactory::GetForProfile(profile)->GetContentSetting(
-          url, GURL(), CONTENT_SETTINGS_TYPE_PLUGINS, kAds);
+          url, GURL(), ContentSettingsType::PLUGINS, kAds);
 
   return setting == CONTENT_SETTING_ALLOW ? ControlType::ALLOW
                                           : ControlType::BLOCK;
 }
 
-// TODO(bridiver) - convert cookie settings to CONTENT_SETTINGS_TYPE_COOKIES
+// TODO(bridiver) - convert cookie settings to ContentSettingsType::COOKIES
 // while maintaining read backwards compat
 void SetCookieControlType(Profile* profile, ControlType type, const GURL& url) {
   return SetCookieControlType(
@@ -215,18 +220,18 @@ void SetCookieControlType(HostContentSettingsMap* map,
 
   map->SetContentSettingCustomScope(primary_pattern,
                                     ContentSettingsPattern::Wildcard(),
-                                    CONTENT_SETTINGS_TYPE_PLUGINS, kReferrers,
+                                    ContentSettingsType::PLUGINS, kReferrers,
                                     GetDefaultBlockFromControlType(type));
 
   map->SetContentSettingCustomScope(
       primary_pattern,
       ContentSettingsPattern::FromString("https://firstParty/*"),
-      CONTENT_SETTINGS_TYPE_PLUGINS, kCookies,
+      ContentSettingsType::PLUGINS, kCookies,
       GetDefaultAllowFromControlType(type));
 
   map->SetContentSettingCustomScope(primary_pattern,
                                     ContentSettingsPattern::Wildcard(),
-                                    CONTENT_SETTINGS_TYPE_PLUGINS, kCookies,
+                                    ContentSettingsType::PLUGINS, kCookies,
                                     GetDefaultBlockFromControlType(type));
 
   RecordShieldsSettingChanged();
@@ -234,12 +239,12 @@ void SetCookieControlType(HostContentSettingsMap* map,
 
 ControlType GetCookieControlType(HostContentSettingsMap* map, const GURL& url) {
   ContentSetting setting = map->GetContentSetting(
-      url, GURL(), CONTENT_SETTINGS_TYPE_PLUGINS, kCookies);
+      url, GURL(), ContentSettingsType::PLUGINS, kCookies);
 
   ContentSetting fp_setting = map->GetContentSetting(
       url,
       GURL("https://firstParty/"),
-      CONTENT_SETTINGS_TYPE_PLUGINS,
+      ContentSettingsType::PLUGINS,
       kCookies);
 
   if (setting == CONTENT_SETTING_ALLOW) {
@@ -258,7 +263,7 @@ bool AllowReferrers(Profile* profile, const GURL& url) {
 
 bool AllowReferrers(HostContentSettingsMap* map, const GURL& url) {
   ContentSetting setting = map->GetContentSetting(
-      url, GURL(), CONTENT_SETTINGS_TYPE_PLUGINS, kReferrers);
+      url, GURL(), ContentSettingsType::PLUGINS, kReferrers);
 
   return setting == CONTENT_SETTING_ALLOW;
 }
@@ -274,13 +279,13 @@ void SetFingerprintingControlType(Profile* profile,
   auto* map = HostContentSettingsMapFactory::GetForProfile(profile);
   map->SetContentSettingCustomScope(
       primary_pattern, ContentSettingsPattern::Wildcard(),
-      CONTENT_SETTINGS_TYPE_PLUGINS, kFingerprinting,
+      ContentSettingsType::PLUGINS, kFingerprinting,
       GetDefaultBlockFromControlType(type));
 
   map->SetContentSettingCustomScope(
       primary_pattern,
       ContentSettingsPattern::FromString("https://firstParty/*"),
-      CONTENT_SETTINGS_TYPE_PLUGINS, kFingerprinting,
+      ContentSettingsType::PLUGINS, kFingerprinting,
       GetDefaultAllowFromControlType(type));
 
   RecordShieldsSettingChanged();
@@ -290,10 +295,10 @@ ControlType GetFingerprintingControlType(Profile* profile, const GURL& url) {
   auto* map = HostContentSettingsMapFactory::GetForProfile(profile);
 
   ContentSetting setting = map->GetContentSetting(
-      url, GURL(), CONTENT_SETTINGS_TYPE_PLUGINS, kFingerprinting);
+      url, GURL(), ContentSettingsType::PLUGINS, kFingerprinting);
   ContentSetting fp_setting =
       map->GetContentSetting(url, GURL("https://firstParty/"),
-                             CONTENT_SETTINGS_TYPE_PLUGINS, kFingerprinting);
+                             ContentSettingsType::PLUGINS, kFingerprinting);
 
   if (setting != fp_setting || setting == CONTENT_SETTING_DEFAULT) {
     return ControlType::BLOCK_THIRD_PARTY;
@@ -314,7 +319,7 @@ void SetHTTPSEverywhereEnabled(Profile* profile,
   HostContentSettingsMapFactory::GetForProfile(profile)
       ->SetContentSettingCustomScope(
           primary_pattern, ContentSettingsPattern::Wildcard(),
-          CONTENT_SETTINGS_TYPE_PLUGINS, kHTTPUpgradableResources,
+          ContentSettingsType::PLUGINS, kHTTPUpgradableResources,
           // this is 'allow_http_upgradeable_resources' so enabling
           // httpse will set the value to 'BLOCK'
           enable ? CONTENT_SETTING_BLOCK : CONTENT_SETTING_ALLOW);
@@ -332,14 +337,14 @@ void ResetHTTPSEverywhereEnabled(Profile* profile,
   HostContentSettingsMapFactory::GetForProfile(profile)
       ->SetContentSettingCustomScope(
           primary_pattern, ContentSettingsPattern::Wildcard(),
-          CONTENT_SETTINGS_TYPE_PLUGINS, kHTTPUpgradableResources,
+          ContentSettingsType::PLUGINS, kHTTPUpgradableResources,
           CONTENT_SETTING_DEFAULT);
 }
 
 bool GetHTTPSEverywhereEnabled(Profile* profile, const GURL& url) {
   ContentSetting setting =
       HostContentSettingsMapFactory::GetForProfile(profile)->GetContentSetting(
-          url, GURL(), CONTENT_SETTINGS_TYPE_PLUGINS, kHTTPUpgradableResources);
+          url, GURL(), ContentSettingsType::PLUGINS, kHTTPUpgradableResources);
 
   return setting == CONTENT_SETTING_ALLOW ? false : true;
 }
@@ -356,7 +361,7 @@ void SetNoScriptControlType(Profile* profile,
   HostContentSettingsMapFactory::GetForProfile(profile)
       ->SetContentSettingCustomScope(
           primary_pattern, ContentSettingsPattern::Wildcard(),
-          CONTENT_SETTINGS_TYPE_JAVASCRIPT, "",
+          ContentSettingsType::JAVASCRIPT, "",
           type == ControlType::ALLOW ? CONTENT_SETTING_ALLOW
                                      : CONTENT_SETTING_BLOCK);
   RecordShieldsSettingChanged();
@@ -365,7 +370,7 @@ void SetNoScriptControlType(Profile* profile,
 ControlType GetNoScriptControlType(Profile* profile, const GURL& url) {
   ContentSetting setting =
       HostContentSettingsMapFactory::GetForProfile(profile)->GetContentSetting(
-          url, GURL(), CONTENT_SETTINGS_TYPE_JAVASCRIPT, "");
+          url, GURL(), ContentSettingsType::JAVASCRIPT, "");
 
   return setting == CONTENT_SETTING_ALLOW ? ControlType::ALLOW
                                           : ControlType::BLOCK;
@@ -380,6 +385,12 @@ void DispatchBlockedEvent(const GURL& request_url,
   BraveShieldsWebContentsObserver::DispatchBlockedEvent(
       block_type, request_url.spec(),
       render_process_id, render_frame_id, frame_tree_node_id);
+
+#if BUILDFLAG(ENABLE_BRAVE_PERF_PREDICTOR)
+  brave_perf_predictor::PerfPredictorTabHelper::DispatchBlockedEvent(
+      request_url.spec(), render_process_id,
+      render_frame_id, frame_tree_node_id);
+#endif
 }
 
 bool ShouldSetReferrer(bool allow_referrers,

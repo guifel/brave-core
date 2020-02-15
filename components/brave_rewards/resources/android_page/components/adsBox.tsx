@@ -9,7 +9,7 @@ import { connect } from 'react-redux'
 // Components
 import BoxMobile, { Props as BoxMobileProps } from '../../ui/components/mobile/boxMobile'
 import { List, NextContribution, Tokens } from '../../ui/components'
-import { Column, Grid, Select, ControlWrapper } from 'brave-ui/components'
+import { Grid, Column, Select, ControlWrapper, Checkbox } from 'brave-ui/components'
 import AdsOnboarding from './adsOnboarding'
 import {
   StyledListContent,
@@ -29,12 +29,14 @@ class AdsBox extends React.Component<Props, {}> {
     super(props)
   }
 
-  onAdsSettingChange = (key: string, value: string) => {
+  onAdsSettingChange = (key: string, value: boolean) => {
     let newValue: any = value
-    const { adsEnabled } = this.props.rewardsData.adsData
+    const { adsEnabled, shouldAllowAdConversionTracking } = this.props.rewardsData.adsData
 
     if (key === 'adsEnabled') {
       newValue = !adsEnabled
+    } else if (key === 'shouldAllowAdConversionTracking') {
+      newValue = !shouldAllowAdConversionTracking
     }
 
     this.props.actions.onAdsSettingSave(key, newValue)
@@ -45,7 +47,7 @@ class AdsBox extends React.Component<Props, {}> {
       return null
     }
 
-    const { adsPerHour } = this.props.rewardsData.adsData
+    const { adsPerHour, shouldAllowAdConversionTracking } = this.props.rewardsData.adsData
 
     return (
       <Grid columns={1} customStyle={{ maxWidth: '270px', margin: '0 auto' }}>
@@ -64,6 +66,18 @@ class AdsBox extends React.Component<Props, {}> {
               })}
             </Select>
           </ControlWrapper>
+          <ControlWrapper text={getLocale('adsOtherSettings')}>
+            <Checkbox
+              value={{
+                shouldAllowAdConversionTracking: shouldAllowAdConversionTracking
+              }}
+              multiple={true}
+              onChange={this.onAdsSettingChange}
+            >
+              <div data-key='shouldAllowAdConversionTracking'>{getLocale('adsAllowConversionTracking')}</div>
+            </Checkbox>
+            <div>{getLocale('adsAllowConversionTrackingDescription')}</div>
+          </ControlWrapper>
         </Column>
       </Grid>
     )
@@ -74,7 +88,7 @@ class AdsBox extends React.Component<Props, {}> {
     let adsEnabled = false
     let adsUIEnabled = false
     let adsIsSupported = false
-    let estimatedPendingRewards = '0'
+    let estimatedPendingRewards = 0
     let nextPaymentDate = ''
     let adNotificationsReceivedThisMonth = 0
     const {
@@ -83,12 +97,13 @@ class AdsBox extends React.Component<Props, {}> {
       balance,
       safetyNetFailed
     } = this.props.rewardsData
+    const { onlyAnonWallet } = this.props.rewardsData.ui
 
     if (adsData) {
       adsEnabled = adsData.adsEnabled
       adsUIEnabled = adsData.adsUIEnabled
       adsIsSupported = adsData.adsIsSupported
-      estimatedPendingRewards = (adsData.adsEstimatedPendingRewards || 0).toFixed(1)
+      estimatedPendingRewards = adsData.adsEstimatedPendingRewards || 0
       nextPaymentDate = adsData.adsNextPaymentDate
       adNotificationsReceivedThisMonth = adsData.adsAdNotificationsReceivedThisMonth || 0
     }
@@ -117,18 +132,21 @@ class AdsBox extends React.Component<Props, {}> {
       boxPropsExtra.extraDescriptionChild = <AdsOnboarding />
     }
 
+    const tokenString = getLocale(onlyAnonWallet ? 'points' : 'tokens')
+
     return (
       <BoxMobile
         title={getLocale('adsTitle')}
         type={'ads'}
-        description={getLocale('adsDesc')}
+        description={getLocale('adsDesc', { currency : tokenString })}
         settingsChild={this.adsSettings(adsEnabled && enabledMain)}
         {...boxPropsExtra}
       >
         <List title={<StyledListContent>{getLocale('adsCurrentEarnings')}</StyledListContent>}>
           <StyledTotalContent>
             <Tokens
-              value={estimatedPendingRewards}
+              onlyAnonWallet={onlyAnonWallet}
+              value={estimatedPendingRewards.toFixed(1)}
               converted={utils.convertBalance(estimatedPendingRewards, balance.rates)}
             />
           </StyledTotalContent>
@@ -143,6 +161,7 @@ class AdsBox extends React.Component<Props, {}> {
         <List title={<StyledListContent>{getLocale('adsNotificationsReceived')}</StyledListContent>}>
           <StyledListContent>
             <Tokens
+              onlyAnonWallet={onlyAnonWallet}
               value={adNotificationsReceivedThisMonth.toString()}
               hideText={true}
             />

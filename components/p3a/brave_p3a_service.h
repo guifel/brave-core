@@ -16,6 +16,7 @@
 #include "brave/components/brave_prochlo/brave_prochlo_message.h"
 #include "brave/components/p3a/brave_p3a_log_store.h"
 #include "chrome/browser/browser_process.h"
+#include "url/gurl.h"
 
 class PrefRegistrySimple;
 
@@ -29,7 +30,7 @@ class BraveP3AUploader;
 // on any thread.
 // TODO(iefremov): It should be possible to get rid of refcounted here.
 class BraveP3AService : public base::RefCountedThreadSafe<BraveP3AService>,
-                        public BraveP3ALogStore::LogSerializer {
+                        public BraveP3ALogStore::Delegate {
  public:
   explicit BraveP3AService(PrefService* local_state);
 
@@ -42,9 +43,11 @@ class BraveP3AService : public base::RefCountedThreadSafe<BraveP3AService>,
   // Needs a living browser process to complete the initialization.
   void Init();
 
-  // BraveP3ALogStore::LogSerializer
+  // BraveP3ALogStore::Delegate
   std::string Serialize(base::StringPiece histogram_name,
                         uint64_t value) const override;
+
+  bool IsActualMetric(base::StringPiece histogram_name) const override;
 
  private:
   friend class base::RefCountedThreadSafe<BraveP3AService>;

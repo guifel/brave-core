@@ -68,33 +68,18 @@ class BatLedgerImpl : public mojom::BatLedger,
       SetPublisherExcludeCallback callback) override;
   void RestorePublishers(RestorePublishersCallback callback) override;
 
-  void SetBalanceReportItem(
-      ledger::ActivityMonth month,
-      int32_t year,
-      ledger::ReportType type,
-      const std::string& probi) override;
-  void OnReconcileCompleteSuccess(
-      const std::string& viewing_id,
-      const ledger::RewardsType type,
-      const std::string& probi,
-      ledger::ActivityMonth month,
-      int32_t year,
-      uint32_t data) override;
-
-  void FetchGrants(
-      const std::string& lang,
-      const std::string& payment_id,
-      const std::string& result_string,
-      FetchGrantsCallback callback) override;
-  void GetGrantCaptcha(const std::vector<std::string>& headers,
-      GetGrantCaptchaCallback callback) override;
+  void FetchPromotions(FetchPromotionsCallback callback) override;
+  void ClaimPromotion(
+      const std::string& payload,
+      ClaimPromotionCallback callback) override;
+  void AttestPromotion(
+      const std::string& promotion_id,
+      const std::string& solution,
+      AttestPromotionCallback callback) override;
   void GetWalletPassphrase(GetWalletPassphraseCallback callback) override;
   void RecoverWallet(
       const std::string& pass_phrase,
       RecoverWalletCallback callback) override;
-  void SolveGrantCaptcha(
-      const std::string& solution,
-      const std::string& promotionId) override;
 
   void SetRewardsMainEnabled(bool enabled) override;
   void SetPublisherMinVisitTime(uint64_t duration_in_seconds) override;
@@ -108,7 +93,6 @@ class BatLedgerImpl : public mojom::BatLedger,
 
   void OnTimer(uint32_t timer_id) override;
 
-  void GetAllBalanceReports(GetAllBalanceReportsCallback callback) override;
   void GetBalanceReport(ledger::ActivityMonth month, int32_t year,
       GetBalanceReportCallback callback) override;
 
@@ -125,7 +109,7 @@ class BatLedgerImpl : public mojom::BatLedger,
       GetPublisherBannerCallback callback) override;
 
   void DoDirectTip(const std::string& publisher_id,
-                   int32_t amount,
+                   double amount,
                    const std::string& currency,
                    DoDirectTipCallback callback) override;
 
@@ -138,11 +122,6 @@ class BatLedgerImpl : public mojom::BatLedger,
   void HasSufficientBalanceToReconcile(
       HasSufficientBalanceToReconcileCallback callback) override;
 
-  void GetGrantViaSafetynetCheck(const std::string& promotion_id) override;
-  void ApplySafetynetToken(
-      const std::string& promotion_id,
-      const std::string& result_string) override;
-
   void GetTransactionHistory(
       GetTransactionHistoryCallback callback) override;
   void GetRewardsInternalsInfo(
@@ -153,7 +132,7 @@ class BatLedgerImpl : public mojom::BatLedger,
   void StartMonthlyContribution() override;
 
   void SaveRecurringTip(
-      ledger::ContributionInfoPtr info,
+      ledger::RecurringTipPtr info,
       SaveRecurringTipCallback callback) override;
   void GetRecurringTips(GetRecurringTipsCallback callback) override;
 
@@ -189,10 +168,8 @@ class BatLedgerImpl : public mojom::BatLedger,
     GetPendingContributionsCallback callback) override;
 
   void RemovePendingContribution(
-    const std::string& publisher_key,
-    const std::string& viewing_id,
-    uint64_t added_date,
-    RemovePendingContributionCallback callback) override;
+      const uint64_t id,
+      RemovePendingContributionCallback callback) override;
 
   void RemoveAllPendingContributions(
     RemovePendingContributionCallback callback) override;
@@ -213,6 +190,18 @@ class BatLedgerImpl : public mojom::BatLedger,
   void DisconnectWallet(
     const std::string& wallet_type,
     DisconnectWalletCallback callback) override;
+
+  void GetAnonWalletStatus(GetAnonWalletStatusCallback callback) override;
+
+  void GetTransactionReport(
+      const ledger::ActivityMonth month,
+      const int year,
+      GetTransactionReportCallback callback) override;
+
+  void GetContributionReport(
+      const ledger::ActivityMonth month,
+      const int year,
+      GetContributionReportCallback callback) override;
 
  private:
   void SetCatalogIssuers(const std::string& info) override;
@@ -240,13 +229,18 @@ class BatLedgerImpl : public mojom::BatLedger,
 
   static void OnGetBalanceReport(
       CallbackHolder<GetBalanceReportCallback>* holder,
-      const bool result,
+      const ledger::Result result,
       ledger::BalanceReportInfoPtr report_info);
 
-  static void OnGetGrantCaptcha(
-      CallbackHolder<GetGrantCaptchaCallback>* holder,
-      const std::string& image,
-      const std::string& hint);
+  static void OnClaimPromotion(
+      CallbackHolder<ClaimPromotionCallback>* holder,
+      const ledger::Result result,
+      const std::string& response);
+
+  static void OnAttestPromotion(
+      CallbackHolder<AttestPromotionCallback>* holder,
+      const ledger::Result result,
+      ledger::PromotionPtr promotion);
 
   static void OnCreateWallet(
       CallbackHolder<CreateWalletCallback>* holder,
@@ -259,8 +253,7 @@ class BatLedgerImpl : public mojom::BatLedger,
   static void OnRecoverWallet(
       CallbackHolder<RecoverWalletCallback>* holder,
       ledger::Result result,
-      double balance,
-      std::vector<ledger::GrantPtr> grants);
+      double balance);
 
   static void OnFetchWalletProperties(
       CallbackHolder<FetchWalletPropertiesCallback>* holder,
@@ -343,10 +336,10 @@ class BatLedgerImpl : public mojom::BatLedger,
     CallbackHolder<GetPendingContributionsTotalCallback>* holder,
     double amount);
 
-  static void OnFetchGrants(
-    CallbackHolder<FetchGrantsCallback>* holder,
-    ledger::Result result,
-    std::vector<ledger::GrantPtr> grants);
+  static void OnFetchPromotions(
+    CallbackHolder<FetchPromotionsCallback>* holder,
+    const ledger::Result result,
+    ledger::PromotionList promotions);
 
   static void OnHasSufficientBalanceToReconcile(
     CallbackHolder<HasSufficientBalanceToReconcileCallback>* holder,
@@ -370,6 +363,18 @@ class BatLedgerImpl : public mojom::BatLedger,
   static void OnDisconnectWallet(
     CallbackHolder<DisconnectWalletCallback>* holder,
     ledger::Result result);
+
+  static void OnGetAnonWalletStatus(
+      CallbackHolder<GetAnonWalletStatusCallback>* holder,
+      const ledger::Result result);
+
+  static void OnGetTransactionReport(
+      CallbackHolder<GetTransactionReportCallback>* holder,
+      ledger::TransactionReportInfoList list);
+
+  static void OnGetContributionReport(
+      CallbackHolder<GetContributionReportCallback>* holder,
+      ledger::ContributionReportInfoList list);
 
   std::unique_ptr<BatLedgerClientMojoProxy> bat_ledger_client_mojo_proxy_;
   std::unique_ptr<ledger::Ledger> ledger_;

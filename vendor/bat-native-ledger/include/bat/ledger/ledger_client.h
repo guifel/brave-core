@@ -72,6 +72,21 @@ using GetServerPublisherInfoCallback =
 using ResultCallback = std::function<void(const Result)>;
 using GetFirstContributionQueueCallback =
     std::function<void(ContributionQueuePtr)>;
+using GetPromotionCallback = std::function<void(PromotionPtr)>;
+using GetAllUnblindedTokensCallback = std::function<void(UnblindedTokenList)>;
+using GetAllPromotionsCallback = std::function<void(PromotionMap)>;
+
+using GetTransactionReportCallback =
+    std::function<void(ledger::TransactionReportInfoList)>;
+
+using GetContributionReportCallback =
+    std::function<void(ledger::ContributionReportInfoList)>;
+
+using GetIncompleteContributionsCallback =
+    std::function<void(ContributionInfoList)>;
+
+using GetContributionInfoCallback =
+    std::function<void(ContributionInfoPtr)>;
 
 class LEDGER_EXPORT LedgerClient {
  public:
@@ -84,10 +99,11 @@ class LEDGER_EXPORT LedgerClient {
       Result result,
       ledger::WalletPropertiesPtr properties) = 0;
 
-  virtual void OnReconcileComplete(Result result,
-                                   const std::string& viewing_id,
-                                   const std::string& probi,
-                                   const ledger::RewardsType type) = 0;
+  virtual void OnReconcileComplete(
+      const Result result,
+      const std::string& viewing_id,
+      const double amount,
+      const ledger::RewardsType type) = 0;
 
   virtual void LoadLedgerState(OnLoadCallback callback) = 0;
 
@@ -126,9 +142,6 @@ class LEDGER_EXPORT LedgerClient {
                                    ActivityInfoFilterPtr filter,
                                    PublisherInfoListCallback callback) = 0;
 
-  virtual void OnGrantFinish(Result result,
-                             ledger::GrantPtr grant) = 0;
-
   virtual void OnPanelPublisherInfo(Result result,
                                    ledger::PublisherInfoPtr publisher_info,
                                    uint64_t windowId) = 0;
@@ -138,15 +151,11 @@ class LEDGER_EXPORT LedgerClient {
                             FetchIconCallback callback) = 0;
 
   virtual void SaveContributionInfo(
-      const std::string& probi,
-      const ledger::ActivityMonth month,
-      const int year,
-      const uint32_t date,
-      const std::string& publisher_key,
-      const ledger::RewardsType type) = 0;
+      ledger::ContributionInfoPtr info,
+      ledger::ResultCallback callback) = 0;
 
   virtual void SaveRecurringTip(
-      ledger::ContributionInfoPtr info,
+      ledger::RecurringTipPtr info,
       ledger::SaveRecurringTipCallback callback) = 0;
 
   virtual void GetRecurringTips(
@@ -158,9 +167,6 @@ class LEDGER_EXPORT LedgerClient {
   virtual void RemoveRecurringTip(
       const std::string& publisher_key,
       ledger::RemoveRecurringTipCallback callback) = 0;
-
-  virtual void OnGrantViaSafetynetCheck(const std::string& promotion_id,
-      const std::string& nonce) = 0;
 
   // uint64_t time_offset (input): timer offset in seconds.
   // uint32_t timer_id (output) : 0 in case of failure
@@ -237,9 +243,7 @@ class LEDGER_EXPORT LedgerClient {
       ledger::PendingContributionInfoListCallback callback) = 0;
 
   virtual void RemovePendingContribution(
-      const std::string& publisher_key,
-      const std::string& viewing_id,
-      uint64_t added_date,
+      const uint64_t id,
       ledger::RemovePendingContributionCallback callback) = 0;
 
   virtual void RemoveAllPendingContributions(
@@ -297,6 +301,66 @@ class LEDGER_EXPORT LedgerClient {
 
   virtual void GetFirstContributionQueue(
     ledger::GetFirstContributionQueueCallback callback) = 0;
+
+  virtual void InsertOrUpdatePromotion(
+    ledger::PromotionPtr info,
+    ledger::ResultCallback callback) = 0;
+
+  virtual void GetPromotion(
+    const std::string& id,
+    ledger::GetPromotionCallback callback) = 0;
+
+  virtual void GetAllPromotions(
+    ledger::GetAllPromotionsCallback callback) = 0;
+
+  virtual void InsertOrUpdateUnblindedToken(
+    ledger::UnblindedTokenPtr info,
+    ledger::ResultCallback callback) = 0;
+
+  virtual void GetAllUnblindedTokens(
+    ledger::GetAllUnblindedTokensCallback callback) = 0;
+
+  virtual void DeleteUnblindedTokens(
+      const std::vector<std::string>& id_list,
+      ledger::ResultCallback callback) = 0;
+
+  virtual void DeleteUnblindedTokensForPromotion(
+      const std::string& promotion_id,
+      ledger::ResultCallback callback) = 0;
+
+  virtual ledger::ClientInfoPtr GetClientInfo() = 0;
+
+  virtual void UnblindedTokensReady() = 0;
+
+  virtual void GetTransactionReport(
+      const ledger::ActivityMonth month,
+      const int year,
+      ledger::GetTransactionReportCallback callback) = 0;
+
+  virtual void GetContributionReport(
+      const ledger::ActivityMonth month,
+      const int year,
+      ledger::GetContributionReportCallback callback) = 0;
+
+  virtual void GetIncompleteContributions(
+      ledger::GetIncompleteContributionsCallback callback) = 0;
+
+  virtual void GetContributionInfo(
+      const std::string& contribution_id,
+      GetContributionInfoCallback callback) = 0;
+
+  virtual void UpdateContributionInfoStepAndCount(
+      const std::string& contribution_id,
+      const ledger::ContributionStep step,
+      const int32_t retry_count,
+      ResultCallback callback) = 0;
+
+  virtual void UpdateContributionInfoContributedAmount(
+      const std::string& contribution_id,
+      const std::string& publisher_key,
+      ResultCallback callback) = 0;
+
+  virtual void ReconcileStampReset() = 0;
 };
 
 }  // namespace ledger

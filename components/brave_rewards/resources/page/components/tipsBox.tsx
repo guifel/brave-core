@@ -72,8 +72,6 @@ class TipBox extends React.Component<Props, State> {
         faviconUrl = `chrome://favicon/size/48@1x/${item.favIcon}`
       }
 
-      const token = utils.convertProbiToFixed(item.percentage.toString())
-
       return {
         profile: {
           name: item.name,
@@ -82,8 +80,8 @@ class TipBox extends React.Component<Props, State> {
           src: faviconUrl
         },
         contribute: {
-          tokens: token,
-          converted: utils.convertBalance(token, balance.rates)
+          tokens: item.percentage.toFixed(1),
+          converted: utils.convertBalance(item.percentage, balance.rates)
         },
         url: item.url,
         text: item.tipDate ? new Date(item.tipDate * 1000).toLocaleDateString() : undefined,
@@ -183,8 +181,9 @@ class TipBox extends React.Component<Props, State> {
     const topRows = tipRows.slice(0, 5)
     const numRows = tipRows && tipRows.length
     const allSites = !(numRows > 5)
-    const total = utils.tipsListTotal(tipsList, true)
+    const total = utils.tipsListTotal(tipsList)
     const converted = utils.convertBalance(total, balance.rates)
+    const { onlyAnonWallet } = ui
 
     return (
       <Box
@@ -207,13 +206,14 @@ class TipBox extends React.Component<Props, State> {
           : null
         }
         <List title={getLocale('donationTotalDonations')}>
-          <Tokens value={total} converted={converted} />
+          <Tokens onlyAnonWallet={onlyAnonWallet} value={total.toFixed(1)} converted={converted} />
         </List>
         <TableDonation
           rows={topRows}
           allItems={allSites}
           numItems={numRows}
           headerColor={true}
+          onlyAnonWallet={onlyAnonWallet}
           onShowAll={this.onModalToggle}
         >
           {getLocale('donationVisitSome')}

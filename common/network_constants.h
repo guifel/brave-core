@@ -25,9 +25,6 @@ extern const char kEmptyDataURI[];
 extern const char kEmptyImageDataURI[];
 extern const char kJSDataURLPrefix[];
 extern const char kGeoLocationsPattern[];
-extern const char kGoogleAnalyticsPattern[];
-extern const char kGoogleTagManagerPattern[];
-extern const char kGoogleTagServicesPattern[];
 extern const char kForbesPattern[];
 extern const char kForbesExtraCookies[];
 extern const char kSafeBrowsingPrefix[];
@@ -38,6 +35,7 @@ extern const char kCRLSetPrefix3[];
 extern const char kCRLSetPrefix4[];
 extern const char kChromeCastPrefix[];
 extern const char kTwitterPattern[];
+extern const char kGoogleOAuthPattern[];
 
 extern const char kCookieHeader[];
 extern const char kRefererHeader[];

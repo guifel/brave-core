@@ -29,6 +29,10 @@ class AdsClientMojoBridge : public mojom::BatAdsClient,
       bool* out_is_enabled) override;
   void IsEnabled(
       IsEnabledCallback callback) override;
+  bool ShouldAllowAdConversionTracking(
+      bool* should_allow) override;
+  void ShouldAllowAdConversionTracking(
+      ShouldAllowAdConversionTrackingCallback callback) override;
   bool IsForeground(
       bool* out_is_foreground) override;
   void IsForeground(
@@ -122,8 +126,11 @@ class AdsClientMojoBridge : public mojom::BatAdsClient,
       const std::string& bundle_state,
       SaveBundleStateCallback callback) override;
   void GetAds(
-      const std::string& category,
+      const std::vector<std::string>& categories,
       GetAdsCallback callback) override;
+  void GetAdConversions(
+      const std::string& url,
+      GetAdConversionsCallback callback) override;
 
  private:
   // workaround to pass base::OnceCallback into std::bind
@@ -171,8 +178,13 @@ class AdsClientMojoBridge : public mojom::BatAdsClient,
   static void OnGetAds(
       CallbackHolder<GetAdsCallback>* holder,
       ads::Result result,
-      const std::string& category,
+      const std::vector<std::string>& categories,
       const std::vector<ads::AdInfo>& ad_info);
+  static void OnGetAdConversions(
+      CallbackHolder<GetAdConversionsCallback>* holder,
+      const ads::Result result,
+      const std::string& url,
+      const std::vector<ads::AdConversionTrackingInfo>& ad_conversions);
 
   ads::AdsClient* ads_client_;
 

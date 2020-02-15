@@ -149,20 +149,25 @@ class PageWallet extends React.Component<Props, State> {
 
   getConversion = () => {
     const balance = this.props.rewardsData.balance
-    return utils.convertBalance(balance.total.toString(), balance.rates)
+    return utils.convertBalance(balance.total, balance.rates)
   }
 
-  getGrants = () => {
-    const grants = this.props.rewardsData.walletInfo.grants
-    if (!grants) {
+  generatePromotions = () => {
+    const promotions = this.props.rewardsData.promotions
+    if (!promotions) {
       return []
     }
 
-    return grants.map((grant: Rewards.Grant) => {
+    let claimedPromotions = promotions.filter((promotion: Rewards.Promotion) => {
+      return promotion.status === 4 // PromotionStatus::FINISHED
+    })
+
+    const typeUGP = 0
+    return claimedPromotions.map((promotion: Rewards.Promotion) => {
       return {
-        tokens: utils.convertProbiToFixed(grant.probi),
-        expireDate: new Date(grant.expiryTime * 1000).toLocaleDateString(),
-        type: grant.type || 'ugp'
+        amount: promotion.amount,
+        expiresAt: new Date(promotion.expiresAt).toLocaleDateString(),
+        type: promotion.type || typeUGP
       }
     })
   }
@@ -264,23 +269,20 @@ class PageWallet extends React.Component<Props, State> {
   }
 
   getWalletSummary = () => {
-    const { balance, reports, pendingContributionTotal } = this.props.rewardsData
+    const { balance, balanceReport, pendingContributionTotal } = this.props.rewardsData
     const { rates } = balance
 
     let props = {}
 
-    const currentTime = new Date()
-    const reportKey = `${currentTime.getFullYear()}_${currentTime.getMonth() + 1}`
-    const report: Rewards.Report = reports[reportKey]
-    if (report) {
-      for (let key in report) {
-        const item = report[key]
+    if (balanceReport) {
+      for (let key in balanceReport) {
+        const item = balanceReport[key]
 
-        if (item.length > 1 && key !== 'total') {
-          const tokens = utils.convertProbiToFixed(item)
+        if (item !== 0) {
+          const tokens = item.toFixed(1)
           props[key] = {
             tokens,
-            converted: utils.convertBalance(tokens, rates)
+            converted: utils.convertBalance(item, rates)
           }
         }
       }
@@ -326,11 +328,11 @@ class PageWallet extends React.Component<Props, State> {
         type,
         amount: {
           tokens: item.amount.toFixed(1),
-          converted: utils.convertBalance(item.amount.toString(), balance.rates)
+          converted: utils.convertBalance(item.amount, balance.rates)
         },
         date: new Date(parseInt(item.expirationDate, 10) * 1000).toLocaleDateString(),
         onRemove: () => {
-          this.actions.removePendingContribution(item.publisherKey, item.viewingId, item.addedDate)
+          this.actions.removePendingContribution(item.id)
         }
       }
     })
@@ -502,7 +504,7 @@ class PageWallet extends React.Component<Props, State> {
           onActivityClick={this.onModalActivityToggle}
           showCopy={showCopy}
           showSecActions={true}
-          grants={this.getGrants()}
+          grants={this.generatePromotions()}
           alert={this.walletAlerts()}
           walletState={this.getWalletStatus()}
           onVerifyClick={onVerifyClick}
@@ -542,6 +544,7 @@ class PageWallet extends React.Component<Props, State> {
         {
           this.state.modalPendingContribution
             ? <ModalPending
+              onlyAnonWallet={onlyAnonWallet}
               onClose={this.onModalPendingToggle}
               rows={this.getPendingRows()}
               onRemoveAll={this.removeAllPendingContribution}

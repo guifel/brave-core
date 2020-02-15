@@ -10,6 +10,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/string_number_conversions.h"
 #include "bat/ledger/global_constants.h"
+#include "bat/ledger/internal/bat_util.h"
 #include "bat/ledger/internal/uphold/uphold.h"
 #include "bat/ledger/internal/uphold/uphold_authorization.h"
 #include "bat/ledger/internal/uphold/uphold_card.h"
@@ -23,6 +24,11 @@
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
+
+namespace {
+  const char kFeeMessage[] =
+      "5% transaction fee collected by Brave Software International";
+}  // namespace
 
 namespace braveledger_uphold {
 
@@ -70,10 +76,11 @@ void Uphold::StartContribution(
                             fee,
                             *wallet);
 
-  transfer_->Start(reconcile_amount,
-                   address,
-                   std::move(wallet),
-                   contribution_callback);
+  Transaction transaction;
+  transaction.address = address;
+  transaction.amount = reconcile_amount;
+
+  transfer_->Start(transaction, std::move(wallet), contribution_callback);
 }
 
 void Uphold::ContributionCompleted(
@@ -83,7 +90,6 @@ void Uphold::ContributionCompleted(
     const double fee,
     const ledger::ExternalWallet& wallet) {
   const auto reconcile = ledger_->GetReconcileById(viewing_id);
-  const auto amount = ConvertToProbi(std::to_string(reconcile.fee_));
 
   if (result == ledger::Result::LEDGER_OK) {
     const auto current_time_seconds = base::Time::Now().ToDoubleT();
@@ -95,17 +101,11 @@ void Uphold::ContributionCompleted(
     SaveTransferFee(std::move(transfer_fee));
   }
 
-  ledger_->OnReconcileComplete(result,
-                               viewing_id,
-                               amount,
-                               reconcile.type_);
-
-  if (result != ledger::Result::LEDGER_OK) {
-    if (!viewing_id.empty()) {
-      ledger_->RemoveReconcileById(viewing_id);
-    }
-    return;
-  }
+  ledger_->ReconcileComplete(
+      result,
+      reconcile.fee,
+      viewing_id,
+      reconcile.type);
 }
 
 void Uphold::FetchBalance(
@@ -185,7 +185,10 @@ void Uphold::TransferFunds(double amount,
                            const std::string& address,
                            ledger::ExternalWalletPtr wallet,
                            TransactionCallback callback) {
-  transfer_->Start(amount, address, std::move(wallet), callback);
+  Transaction transaction;
+  transaction.address = address;
+  transaction.amount = amount;
+  transfer_->Start(transaction, std::move(wallet), callback);
 }
 
 void Uphold::WalletAuthorization(
@@ -321,11 +324,12 @@ void Uphold::TransferFee(
           _2,
           transfer_fee);
 
-      transfer_->Start(
-          transfer_fee.amount,
-          GetFeeAddress(),
-          std::move(wallet),
-          callback);
+  Transaction transaction;
+  transaction.address = GetFeeAddress();
+  transaction.amount = transfer_fee.amount;
+  transaction.message = kFeeMessage;
+
+  transfer_->Start(transaction, std::move(wallet), callback);
 }
 
 void Uphold::TransferFeeOnTimer(const uint32_t timer_id) {

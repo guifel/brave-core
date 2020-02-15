@@ -13,8 +13,8 @@
 #include <vector>
 
 #include "base/containers/flat_map.h"
+#include "brave/base/containers/utils.h"
 #include "brave/components/services/bat_ledger/bat_ledger_client_mojo_proxy.h"
-#include "mojo/public/cpp/bindings/map.h"
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -158,7 +158,7 @@ void BatLedgerImpl::OnXHRLoad(uint32_t tab_id, const std::string& url,
     const base::flat_map<std::string, std::string>& parts,
     const std::string& first_party_url, const std::string& referrer,
     ledger::VisitDataPtr visit_data) {
-    ledger_->OnXHRLoad(tab_id, url, mojo::FlatMapToMap(parts),
+    ledger_->OnXHRLoad(tab_id, url, base::FlatMapToMap(parts),
         first_party_url, referrer, std::move(visit_data));
 }
 
@@ -206,80 +206,68 @@ void BatLedgerImpl::RestorePublishers(RestorePublishersCallback callback) {
     std::bind(BatLedgerImpl::OnRestorePublishers, holder, _1));
 }
 
-void BatLedgerImpl::SetBalanceReportItem(
-    ledger::ActivityMonth month,
-    int32_t year,
-    ledger::ReportType type,
-    const std::string& probi) {
-  ledger_->SetBalanceReportItem(month, year, type, probi);
-}
-
-void BatLedgerImpl::OnReconcileCompleteSuccess(
-    const std::string& viewing_id,
-    const ledger::RewardsType type,
-    const std::string& probi,
-    ledger::ActivityMonth month,
-    int32_t year,
-    uint32_t data) {
-  ledger_->OnReconcileCompleteSuccess(
-      viewing_id,
-      type,
-      probi,
-      month,
-      year,
-      data);
-}
-
-void BatLedgerImpl::OnFetchGrants(
-    CallbackHolder<FetchGrantsCallback>* holder,
-    ledger::Result result,
-    std::vector<ledger::GrantPtr> grants) {
+void BatLedgerImpl::OnFetchPromotions(
+    CallbackHolder<FetchPromotionsCallback>* holder,
+    const ledger::Result result,
+    ledger::PromotionList promotions) {
   DCHECK(holder);
   if (holder->is_valid()) {
-    std::move(holder->get()).Run(result, std::move(grants));
+    std::move(holder->get()).Run(result, std::move(promotions));
   }
   delete holder;
 }
 
-void BatLedgerImpl::FetchGrants(const std::string& lang,
-    const std::string& payment_id,
-    const std::string& result_string,
-    FetchGrantsCallback callback) {
-  // deleted in OnFetchGrants
-  auto* holder = new CallbackHolder<FetchGrantsCallback>(
+void BatLedgerImpl::FetchPromotions(
+    FetchPromotionsCallback callback) {
+  // deleted in OnFetchPromotions
+  auto* holder = new CallbackHolder<FetchPromotionsCallback>(
       AsWeakPtr(), std::move(callback));
-  ledger_->FetchGrants(lang, payment_id, result_string,
-      std::bind(BatLedgerImpl::OnFetchGrants, holder, _1, _2));
+  ledger_->FetchPromotions(
+      std::bind(BatLedgerImpl::OnFetchPromotions, holder, _1, _2));
 }
-
-void BatLedgerImpl::GetGrantViaSafetynetCheck(const std::string& promotion_id) {
-  ledger_->GetGrantViaSafetynetCheck(promotion_id);
-}
-
-void BatLedgerImpl::ApplySafetynetToken(
-    const std::string& promotion_id, const std::string& result_string) {
-  ledger_->ApplySafetynetToken(promotion_id, result_string);
-}
-
 
 // static
-void BatLedgerImpl::OnGetGrantCaptcha(
-    CallbackHolder<GetGrantCaptchaCallback>* holder,
-    const std::string& image,
-    const std::string& hint) {
+void BatLedgerImpl::OnClaimPromotion(
+    CallbackHolder<ClaimPromotionCallback>* holder,
+    const ledger::Result result,
+    const std::string& response) {
   DCHECK(holder);
   if (holder->is_valid())
-    std::move(holder->get()).Run(image, hint);
+    std::move(holder->get()).Run(result, response);
   delete holder;
 }
-void BatLedgerImpl::GetGrantCaptcha(
-    const std::vector<std::string>& headers,
-    GetGrantCaptchaCallback callback) {
-  // deleted in OnGetGrantCaptcha
-  auto* holder = new CallbackHolder<GetGrantCaptchaCallback>(
+void BatLedgerImpl::ClaimPromotion(
+    const std::string& payload,
+    ClaimPromotionCallback callback) {
+  // deleted in OnClaimPromotion
+  auto* holder = new CallbackHolder<ClaimPromotionCallback>(
       AsWeakPtr(), std::move(callback));
-  ledger_->GetGrantCaptcha(headers,
-      std::bind(BatLedgerImpl::OnGetGrantCaptcha, holder, _1, _2));
+  ledger_->ClaimPromotion(
+      payload,
+      std::bind(BatLedgerImpl::OnClaimPromotion, holder, _1, _2));
+}
+
+// static
+void BatLedgerImpl::OnAttestPromotion(
+    CallbackHolder<AttestPromotionCallback>* holder,
+    const ledger::Result result,
+    ledger::PromotionPtr promotion) {
+  DCHECK(holder);
+  if (holder->is_valid())
+    std::move(holder->get()).Run(result, std::move(promotion));
+  delete holder;
+}
+void BatLedgerImpl::AttestPromotion(
+    const std::string& promotion_id,
+    const std::string& solution,
+    AttestPromotionCallback callback) {
+  // deleted in OnAttestPromotion
+  auto* holder = new CallbackHolder<AttestPromotionCallback>(
+      AsWeakPtr(), std::move(callback));
+  ledger_->AttestPromotion(
+      promotion_id,
+      solution,
+      std::bind(BatLedgerImpl::OnAttestPromotion, holder, _1, _2));
 }
 
 void BatLedgerImpl::GetWalletPassphrase(GetWalletPassphraseCallback callback) {
@@ -290,10 +278,9 @@ void BatLedgerImpl::GetWalletPassphrase(GetWalletPassphraseCallback callback) {
 void BatLedgerImpl::OnRecoverWallet(
     CallbackHolder<RecoverWalletCallback>* holder,
     ledger::Result result,
-    double balance,
-    std::vector<ledger::GrantPtr> grants) {
+    double balance) {
   if (holder->is_valid())
-    std::move(holder->get()).Run(result, balance, std::move(grants));
+    std::move(holder->get()).Run(result, balance);
   delete holder;
 }
 
@@ -307,13 +294,7 @@ void BatLedgerImpl::RecoverWallet(
       BatLedgerImpl::OnRecoverWallet,
       holder,
       _1,
-      _2,
-      _3));
-}
-
-void BatLedgerImpl::SolveGrantCaptcha(const std::string& solution,
-                                      const std::string& promotion_id) {
-  ledger_->SolveGrantCaptcha(solution, promotion_id);
+      _2));
 }
 
 void BatLedgerImpl::SetRewardsMainEnabled(bool enabled) {
@@ -356,25 +337,19 @@ void BatLedgerImpl::OnTimer(uint32_t timer_id) {
   ledger_->OnTimer(timer_id);
 }
 
-void BatLedgerImpl::GetAllBalanceReports(
-    GetAllBalanceReportsCallback callback) {
-  std::map<std::string, ledger::BalanceReportInfoPtr> reports =
-    ledger_->GetAllBalanceReports();
-  auto out_reports = mojo::MapToFlatMap(std::move(reports));
-  std::move(callback).Run(std::move(out_reports));
-}
-
 // static
 void BatLedgerImpl::OnGetBalanceReport(
     CallbackHolder<GetBalanceReportCallback>* holder,
-    const bool result,
+    const ledger::Result result,
     ledger::BalanceReportInfoPtr report_info) {
   DCHECK(holder);
   if (holder->is_valid())
     std::move(holder->get()).Run(result, std::move(report_info));
   delete holder;
 }
-void BatLedgerImpl::GetBalanceReport(ledger::ActivityMonth month, int32_t year,
+void BatLedgerImpl::GetBalanceReport(
+    const ledger::ActivityMonth month,
+    const int32_t year,
     GetBalanceReportCallback callback) {
   auto* holder = new CallbackHolder<GetBalanceReportCallback>(
       AsWeakPtr(), std::move(callback));
@@ -430,7 +405,7 @@ void BatLedgerImpl::OnDoDirectTip(
 }
 
 void BatLedgerImpl::DoDirectTip(const std::string& publisher_id,
-                                int32_t amount,
+                                double amount,
                                 const std::string& currency,
                                 DoDirectTipCallback callback) {
   // deleted in OnDoDirectTip
@@ -552,7 +527,7 @@ void BatLedgerImpl::OnSaveRecurringTip(
 }
 
 void BatLedgerImpl::SaveRecurringTip(
-    ledger::ContributionInfoPtr info,
+    ledger::RecurringTipPtr info,
     SaveRecurringTipCallback callback) {
   // deleted in OnSaveRecurringTip
   auto* holder = new CallbackHolder<SaveRecurringTipCallback>(
@@ -674,7 +649,7 @@ void BatLedgerImpl::SaveMediaInfo(
 
   ledger_->SaveMediaInfo(
       type,
-      mojo::FlatMapToMap(args),
+      base::FlatMapToMap(args),
       std::bind(BatLedgerImpl::OnSaveMediaInfoCallback, holder, _1, _2));
 }
 
@@ -716,7 +691,7 @@ void BatLedgerImpl::GetShareURL(
     const std::string& type,
     const base::flat_map<std::string, std::string>& args,
     GetShareURLCallback callback) {
-  std::move(callback).Run(ledger_->GetShareURL(type, mojo::FlatMapToMap(args)));
+  std::move(callback).Run(ledger_->GetShareURL(type, base::FlatMapToMap(args)));
 }
 
 // static
@@ -751,17 +726,13 @@ void BatLedgerImpl::OnRemovePendingContribution(
 }
 
 void BatLedgerImpl::RemovePendingContribution(
-    const std::string& publisher_key,
-    const std::string& viewing_id,
-    uint64_t added_date,
+    const uint64_t id,
     RemovePendingContributionCallback callback) {
   auto* holder = new CallbackHolder<RemovePendingContributionCallback>(
       AsWeakPtr(), std::move(callback));
 
   ledger_->RemovePendingContribution(
-      publisher_key,
-      viewing_id,
-      added_date,
+      id,
       std::bind(BatLedgerImpl::OnRemovePendingContribution,
                 holder,
                 _1));
@@ -863,7 +834,7 @@ void BatLedgerImpl::OnExternalWalletAuthorization(
     ledger::Result result,
     const std::map<std::string, std::string>& args) {
   if (holder->is_valid())
-    std::move(holder->get()).Run(result, mojo::MapToFlatMap(args));
+    std::move(holder->get()).Run(result, base::MapToFlatMap(args));
   delete holder;
 }
 
@@ -876,7 +847,7 @@ void BatLedgerImpl::ExternalWalletAuthorization(
 
   ledger_->ExternalWalletAuthorization(
       wallet_type,
-      mojo::FlatMapToMap(args),
+      base::FlatMapToMap(args),
       std::bind(BatLedgerImpl::OnExternalWalletAuthorization,
                 holder,
                 _1,
@@ -902,6 +873,84 @@ void BatLedgerImpl::DisconnectWallet(
   ledger_->DisconnectWallet(
       wallet_type,
       std::bind(BatLedgerImpl::OnDisconnectWallet,
+                holder,
+                _1));
+}
+
+// static
+void BatLedgerImpl::OnGetAnonWalletStatus(
+    CallbackHolder<GetAnonWalletStatusCallback>* holder,
+    const ledger::Result result) {
+  if (holder->is_valid()) {
+    std::move(holder->get()).Run(result);
+  }
+  delete holder;
+}
+
+void BatLedgerImpl::GetAnonWalletStatus(GetAnonWalletStatusCallback callback) {
+  auto* holder = new CallbackHolder<GetAnonWalletStatusCallback>(
+      AsWeakPtr(), std::move(callback));
+
+  ledger_->GetAnonWalletStatus(
+      std::bind(BatLedgerImpl::OnGetAnonWalletStatus,
+                holder,
+                _1));
+}
+
+// static
+void BatLedgerImpl::OnGetTransactionReport(
+    CallbackHolder<GetTransactionReportCallback>* holder,
+    ledger::TransactionReportInfoList list) {
+  if (!holder) {
+    return;
+  }
+
+  if (holder->is_valid()) {
+    std::move(holder->get()).Run(std::move(list));
+  }
+  delete holder;
+}
+
+void BatLedgerImpl::GetTransactionReport(
+    const ledger::ActivityMonth month,
+    const int year,
+    GetTransactionReportCallback callback) {
+  auto* holder = new CallbackHolder<GetTransactionReportCallback>(
+      AsWeakPtr(), std::move(callback));
+
+  ledger_->GetTransactionReport(
+      month,
+      year,
+      std::bind(BatLedgerImpl::OnGetTransactionReport,
+                holder,
+                _1));
+}
+
+// static
+void BatLedgerImpl::OnGetContributionReport(
+    CallbackHolder<GetContributionReportCallback>* holder,
+    ledger::ContributionReportInfoList list) {
+  if (!holder) {
+    return;
+  }
+
+  if (holder->is_valid()) {
+    std::move(holder->get()).Run(std::move(list));
+  }
+  delete holder;
+}
+
+void BatLedgerImpl::GetContributionReport(
+    const ledger::ActivityMonth month,
+    const int year,
+    GetContributionReportCallback callback) {
+  auto* holder = new CallbackHolder<GetContributionReportCallback>(
+      AsWeakPtr(), std::move(callback));
+
+  ledger_->GetContributionReport(
+      month,
+      year,
+      std::bind(BatLedgerImpl::OnGetContributionReport,
                 holder,
                 _1));
 }

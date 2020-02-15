@@ -12,8 +12,16 @@ namespace prefs {
 // Stores whether Brave ads is enabled or disabled
 const char kEnabled[] = "brave.brave_ads.enabled";
 
+// Stores whether Brave ads should allow ad conversion tracking
+const char kShouldAllowAdConversionTracking[] =
+    "brave.brave_ads.should_allow_ad_conversion_tracking";
+
 // Stores whether ads were disabled at least once
-const char kBraveAdsWereDisabled[] = "brave.brave_ads.were_disabled";
+const char kAdsWereDisabled[] = "brave.brave_ads.were_disabled";
+
+// Indicates whether we have any initial state of the ads status metric, besides
+// "No Wallet".
+const char kHasAdsP3AState[] = "brave.brave_ads.has_p3a_state";
 
 // Stores the maximum amount of ads per hour
 const char kAdsPerHour[] = "brave.brave_ads.ads_per_hour";
@@ -42,12 +50,12 @@ const char kSupportedRegionsLastSchemaVersion[] =
 const char kSupportedRegionsSchemaVersion[] =
     "brave.brave_ads.supported_regions_schema_version_number";
 
-const int kSupportedRegionsSchemaVersionNumber = 4;
+const int kSupportedRegionsSchemaVersionNumber = 5;
 
 // Stores the preferences version number
 const char kVersion[] = "brave.brave_ads.prefs.version";
 
-const int kCurrentVersionNumber = 6;
+const int kCurrentVersionNumber = 7;
 
 }  // namespace prefs
 

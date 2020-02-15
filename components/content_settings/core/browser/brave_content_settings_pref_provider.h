@@ -19,7 +19,7 @@
 namespace content_settings {
 
 // With this subclass, shields configuration is persisted across sessions.
-// Its content type is |CONTENT_SETTINGS_TYPE_PLUGIN| and its storage option is
+// Its content type is |ContentSettingsType::PLUGIN| and its storage option is
 // ephemeral because chromium want that flash configuration shouldn't be
 // persisted. (Maybe chromium assumes flash is the only one of this type).
 // Because of this reasion, shields configuration was also ephemeral.
@@ -56,6 +56,7 @@ class BravePrefProvider : public PrefProvider,
                                const ContentSettingsPattern& secondary_pattern,
                                ContentSettingsType content_type,
                                const std::string& resource_identifier) override;
+  void OnCookiePrefsChanged(const std::string& pref);
 
   // PrefProvider::pref_change_registrar_ alreay has plugin type.
   PrefChangeRegistrar brave_pref_change_registrar_;

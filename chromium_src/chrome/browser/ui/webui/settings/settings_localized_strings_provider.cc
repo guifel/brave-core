@@ -4,6 +4,7 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "chrome/browser/ui/webui/settings/settings_localized_strings_provider.h"
+#include "chrome/browser/ui/webui/webui_util.h"
 #include "base/stl_util.h"
 #include "brave/browser/ui/webui/settings/brave_privacy_handler.h"
 
@@ -28,14 +29,13 @@ void BraveAddLocalizedStrings(content::WebUIDataSource*, Profile*);
 namespace settings {
 
 void BraveAddImportDataStrings(content::WebUIDataSource* html_source) {
-  LocalizedString localized_strings[] = {
+  webui::LocalizedString localized_strings[] = {
       {"importCookies", IDS_SETTINGS_IMPORT_COOKIES_CHECKBOX},
       {"importStats", IDS_SETTINGS_IMPORT_STATS_CHECKBOX},
       {"importLedger", IDS_SETTINGS_IMPORT_LEDGER_CHECKBOX},
       {"importWindows", IDS_SETTINGS_IMPORT_WINDOWS_CHECKBOX},
   };
-  AddLocalizedStringsBulk(html_source, localized_strings,
-                          base::size(localized_strings));
+  AddLocalizedStringsBulk(html_source, localized_strings);
 }
 
 const char kWebRTCLearnMoreURL[] =
@@ -44,7 +44,7 @@ const char kWebRTCLearnMoreURL[] =
 
 void BraveAddCommonStrings(content::WebUIDataSource* html_source,
                            Profile* profile) {
-  LocalizedString localized_strings[] = {
+  webui::LocalizedString localized_strings[] = {
     {"siteSettingsAutoplay",
       IDS_SETTINGS_SITE_SETTINGS_AUTOPLAY},
     {"siteSettingsCategoryAutoplay",
@@ -73,6 +73,8 @@ void BraveAddCommonStrings(content::WebUIDataSource* html_source,
       IDS_SETTINGS_BRAVE_TABS_TITLE},
     {"mruCyclingSettingLabel",
       IDS_SETTINGS_BRAVE_MRU_CYCLING_LABEL},
+    {"appearanceSettingsShowAutocompleteInAddressBar",
+       IDS_SETTINGS_APPEARANCE_SETTINGS_SHOW_AUTOCOMPLETE_IN_ADDRESS_BAR},
     {"braveShieldsTitle",
       IDS_SETTINGS_BRAVE_SHIELDS_TITLE},
     {"braveShieldsDefaultsSectionTitle",
@@ -101,7 +103,9 @@ void BraveAddCommonStrings(content::WebUIDataSource* html_source,
       IDS_SETTINGS_BRAVE_SHIELDS_HTTPS_EVERYWHERE_CONTROL_LABEL},
     {"noScriptControlLabel",
       IDS_SETTINGS_BRAVE_SHIELDS_NO_SCRIPT_CONTROL_LABEL},
-    {"fbEmbedControlLabel",
+   {"googleLoginControlLabel",
+      IDS_SETTINGS_BRAVE_SHIELDS_GOOGLE_LOGINS_LABEL},
+   {"fbEmbedControlLabel",
       IDS_SETTINGS_BRAVE_SHIELDS_FACEBOOK_EMBEDDED_POSTS_LABEL},
     {"twitterEmbedControlLabel",
       IDS_SETTINGS_BRAVE_SHIELDS_TWITTER_EMBEDDED_TWEETS_LABEL},
@@ -137,20 +141,28 @@ void BraveAddCommonStrings(content::WebUIDataSource* html_source,
       IDS_SETTINGS_BRAVE_SYNC_TITLE},
     {"braveSyncLabel",
       IDS_SETTINGS_BRAVE_SYNC_LINK_LABEL},
+    {"braveHelpTips",
+      IDS_SETTINGS_HELP_TIPS},
+    {"braveHelpTipsWaybackMachineLabel",
+      IDS_SETTINGS_HELP_TIPS_SHOW_BRAVE_WAYBACK_MACHINE_PROMPT},
     {"onExitPageTitle",
       IDS_SETTINGS_BRAVE_ON_EXIT},
     {"braveDefaultExtensions",
       IDS_SETTINGS_BRAVE_DEFAULT_EXTENSIONS_TITLE},
     {"webTorrentEnabledDesc",
       IDS_SETTINGS_WEBTORRENT_ENABLED_DESC},
-    {"braveWalletEnabledDesc",
-      IDS_SETTINGS_BRAVE_WALLET_ENABLED_DESC},
+    {"braveWeb3ProviderDesc",
+      IDS_SETTINGS_BRAVE_WEB3_PROVIDER_DESC},
     {"hangoutsEnabledDesc",
       IDS_SETTINGS_HANGOUTS_ENABLED_DESC},
     {"ipfsCompanionEnabledDesc",
       IDS_SETTINGS_IPFS_COMPANION_ENABLED_DESC},
     {"mediaRouterEnabledDesc",
       IDS_SETTINGS_MEDIA_ROUTER_ENABLED_DESC},
+    {"torEnabledLabel",
+      IDS_SETTINGS_ENABLE_TOR_TITLE},
+    {"torEnabledDesc",
+      IDS_SETTINGS_ENABLE_TOR_DESC},
     {"restartNotice",
       IDS_SETTINGS_RESTART_NOTICE},
     {"relaunchButtonLabel",
@@ -164,10 +176,11 @@ void BraveAddCommonStrings(content::WebUIDataSource* html_source,
     {"p3aEnableTitle",
       IDS_BRAVE_P3A_ENABLE_SETTING},
     {"p3aEnabledDesc",
-      IDS_BRAVE_P3A_ENABLE_SETTING_SUBITEM}
+      IDS_BRAVE_P3A_ENABLE_SETTING_SUBITEM},
+    {"remoteDebuggingEnabledTitle",
+      IDS_SETTINGS_REMOTE_DEBUGGING_TITLE}
   };
-  AddLocalizedStringsBulk(html_source, localized_strings,
-                          base::size(localized_strings));
+  AddLocalizedStringsBulk(html_source, localized_strings);
   html_source->AddString("webRTCLearnMoreURL",
                          base::ASCIIToUTF16(kWebRTCLearnMoreURL));
   html_source->AddString(

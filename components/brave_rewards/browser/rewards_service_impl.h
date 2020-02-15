@@ -26,9 +26,9 @@
 #include "content/public/browser/browser_thread.h"
 #include "extensions/buildflags/buildflags.h"
 #include "mojo/public/cpp/bindings/associated_binding.h"
+#include "mojo/public/cpp/bindings/remote.h"
 #include "brave/components/brave_rewards/browser/balance_report.h"
 #include "brave/components/brave_rewards/browser/content_site.h"
-#include "brave/components/brave_rewards/browser/contribution_info.h"
 #include "ui/gfx/image/image.h"
 #include "brave/components/brave_rewards/browser/publisher_banner.h"
 #include "brave/components/brave_rewards/browser/rewards_service_private_observer.h"
@@ -103,18 +103,18 @@ class RewardsServiceImpl : public RewardsService,
   void StartLedger();
   void CreateWallet(CreateWalletCallback callback) override;
   void FetchWalletProperties() override;
-  void FetchGrants(const std::string& lang,
-                   const std::string& paymentId) override;
-  void GetGrantCaptcha(
+  void FetchPromotions() override;
+  void ClaimPromotion(ClaimPromotionCallback callback) override;
+  void ClaimPromotion(
       const std::string& promotion_id,
-      const std::string& promotion_type) override;
-  void SolveGrantCaptcha(const std::string& solution,
-                         const std::string& promotionId) const override;
+      AttestPromotionCallback callback) override;
+  void AttestPromotion(
+      const std::string& promotion_id,
+      const std::string& solution,
+      AttestPromotionCallback callback) override;
   void GetWalletPassphrase(
       const GetWalletPassphraseCallback& callback) override;
   void RecoverWallet(const std::string& passPhrase) override;
-  void GetGrantViaSafetynetCheck(
-      const std::string& promotion_id) const override;
   void GetContentSiteList(
       uint32_t start,
       uint32_t limit,
@@ -164,9 +164,10 @@ class RewardsServiceImpl : public RewardsService,
   void SaveMediaPublisherInfo(const std::string& media_key,
                               const std::string& publisher_id) override;
   void RestorePublishersUI() override;
-  void GetAllBalanceReports(
-      const GetAllBalanceReportsCallback& callback) override;
-  void GetCurrentBalanceReport() override;
+  void GetBalanceReport(
+      const uint32_t month,
+      const uint32_t year,
+      GetBalanceReportCallback callback) override;
   void IsWalletCreated(const IsWalletCreatedCallback& callback) override;
   void GetPublisherActivityFromUrl(
       uint64_t window_id,
@@ -223,7 +224,7 @@ class RewardsServiceImpl : public RewardsService,
       const ledger::Result result);
   void SaveRecurringTipUI(
       const std::string& publisher_key,
-      const int amount,
+      const double amount,
       SaveRecurringTipCallback callback) override;
 
   const RewardsNotificationService::RewardsNotificationsMap&
@@ -251,19 +252,17 @@ class RewardsServiceImpl : public RewardsService,
   void GetPendingContributionsUI(
     GetPendingContributionsCallback callback) override;
 
-  void RemovePendingContributionUI(const std::string& publisher_key,
-                                 const std::string& viewing_id,
-                                 uint64_t added_date) override;
+  void RemovePendingContributionUI(const uint64_t id) override;
 
   void RemoveAllPendingContributionsUI() override;
 
   void OnTip(const std::string& publisher_key,
-             int amount,
+             double amount,
              bool recurring) override;
 
   void OnTip(
       const std::string& publisher_key,
-      const int amount,
+      const double amount,
       const bool recurring,
       std::unique_ptr<brave_rewards::ContentSite> site) override;
 
@@ -295,12 +294,23 @@ class RewardsServiceImpl : public RewardsService,
 
   bool OnlyAnonWallet() override;
 
+  void GetAnonWalletStatus(GetAnonWalletStatusCallback callback) override;
+
+  void SetAutoContribute(bool enabled) override;
+
+  void GetMonthlyReport(
+      const uint32_t month,
+      const uint32_t year,
+      GetMonthlyReportCallback callback) override;
+
   // Testing methods
   void SetLedgerEnvForTesting();
   void StartMonthlyContributionForTest();
   void MaybeShowNotificationAddFundsForTesting(
       base::OnceCallback<void(bool)> callback);
   void CheckInsufficientFundsForTesting();
+  ledger::TransferFeeList GetTransferFeesForTesting(
+      const std::string& wallet_type);
 
  private:
   friend class ::BraveRewardsBrowserTest;
@@ -323,12 +333,12 @@ class RewardsServiceImpl : public RewardsService,
                               const std::string& data);
   void OnFetchWalletProperties(const ledger::Result result,
                                ledger::WalletPropertiesPtr properties);
-  void OnFetchGrants(
+  void OnFetchPromotions(
     const ledger::Result result,
-    std::vector<ledger::GrantPtr> grants);
-  void TriggerOnGrant(const ledger::Result result, ledger::GrantPtr grant);
-  void TriggerOnGrantCaptcha(const std::string& image, const std::string& hint);
-  void TriggerOnGrantFinish(ledger::Result result, ledger::GrantPtr grant);
+    ledger::PromotionList promotions);
+  void TriggerOnPromotion(
+      const ledger::Result result,
+      ledger::PromotionPtr promotion);
   void TriggerOnRewardsMainEnabled(bool rewards_main_enabled);
   void OnPublisherInfoSaved(ledger::PublisherInfoCallback callback,
                             ledger::PublisherInfoPtr info,
@@ -355,16 +365,21 @@ class RewardsServiceImpl : public RewardsService,
                      const std::string& value);
   void OnResetState(ledger::OnResetCallback callback,
                                  bool success);
-  void OnTipPublisherInfoSaved(const ledger::Result result,
-                               ledger::PublisherInfoPtr info);
+  void OnTipPublisherInfoSaved(
+      const ledger::Result result,
+      ledger::PublisherInfoPtr info,
+      const bool recurring,
+      const double amount);
   void OnTip(const std::string& publisher_key,
-             int amount,
+             double amount,
              bool recurring,
              ledger::PublisherInfoPtr publisher_info);
   void OnResetTheWholeState(base::Callback<void(bool)> callback,
                                  bool success);
-  void OnContributionInfoSaved(const ledger::RewardsType type,
-                               bool success);
+  void OnContributionInfoSaved(
+      ledger::ResultCallback callback,
+      const ledger::Result result);
+
   void OnRecurringTipSaved(
       ledger::SaveRecurringTipCallback callback,
       const bool success);
@@ -489,23 +504,44 @@ class RewardsServiceImpl : public RewardsService,
 
   void OnWalletInitialized(ledger::Result result);
 
+  void OnClaimPromotion(
+      ClaimPromotionCallback callback,
+      const ledger::Result result,
+      const std::string& response);
+
+  void AttestationAndroid(
+      const std::string& promotion_id,
+      AttestPromotionCallback callback,
+      const ledger::Result result,
+      const std::string& response);
+
+  void OnAttestationAndroid(
+      const std::string& promotion_id,
+      AttestPromotionCallback callback,
+      const std::string& nonce,
+      bool result,
+      const std::string& token);
+
+  void OnGetAnonWalletStatus(
+      GetAnonWalletStatusCallback callback,
+      const ledger::Result result);
+
   // ledger::LedgerClient
   std::string GenerateGUID() const override;
-  void OnGrantCaptcha(const std::string& image,
-                      const std::string& hint);
-  void OnRecoverWallet(ledger::Result result,
-                      double balance,
-                      std::vector<ledger::GrantPtr> grants);
-  void OnReconcileComplete(ledger::Result result,
-                           const std::string& viewing_id,
-                           const std::string& probi,
-                           const ledger::RewardsType type) override;
-  void OnGrantFinish(ledger::Result result,
-                     ledger::GrantPtr grant) override;
+  void OnRecoverWallet(
+      ledger::Result result,
+      double balance);
+  void OnReconcileComplete(
+      const ledger::Result result,
+      const std::string& viewing_id,
+      const double amount,
+      const ledger::RewardsType type) override;
+  void OnAttestPromotion(
+      AttestPromotionCallback callback,
+      const ledger::Result result,
+      ledger::PromotionPtr promotion);
   void LoadLedgerState(ledger::OnLoadCallback callback) override;
   void LoadPublisherState(ledger::OnLoadCallback callback) override;
-  void OnGrantViaSafetynetCheck(const std::string& promotion_id,
-                    const std::string& nonce) override;
   void SaveLedgerState(const std::string& ledger_state,
                        ledger::LedgerCallbackHandler* handler) override;
   void SavePublisherState(const std::string& publisher_state,
@@ -535,7 +571,6 @@ class RewardsServiceImpl : public RewardsService,
   void SetPublisherAllowNonVerified(bool allow) const override;
   void SetPublisherAllowVideos(bool allow) const override;
   void SetUserChangedContribution() const override;
-  void SetAutoContribute(bool enabled) override;
   void UpdateAdsRewards() const override;
   void SetCatalogIssuers(const std::string& json) override;
   void ConfirmAd(const std::string& json) override;
@@ -561,14 +596,12 @@ class RewardsServiceImpl : public RewardsService,
   void OnSetOnDemandFaviconComplete(const std::string& favicon_url,
                                     ledger::FetchIconCallback callback,
                                     bool success);
-  void SaveContributionInfo(const std::string& probi,
-                            const ledger::ActivityMonth month,
-                            const int year,
-                            const uint32_t date,
-                            const std::string& publisher_key,
-                            const ledger::RewardsType type) override;
-  void SaveRecurringTip(
+  void SaveContributionInfo(
       ledger::ContributionInfoPtr info,
+      ledger::ResultCallback callback) override;
+
+  void SaveRecurringTip(
+      ledger::RecurringTipPtr info,
       ledger::SaveRecurringTipCallback callback) override;
 
   void GetRecurringTips(
@@ -638,9 +671,7 @@ class RewardsServiceImpl : public RewardsService,
     ledger::PendingContributionInfoListCallback callback) override;
 
   void RemovePendingContribution(
-    const std::string& publisher_key,
-    const std::string& viewing_id,
-    uint64_t added_date,
+    const uint64_t id,
     ledger::RemovePendingContributionCallback callback) override;
 
   void RemoveAllPendingContributions(
@@ -684,17 +715,72 @@ class RewardsServiceImpl : public RewardsService,
   void GetFirstContributionQueue(
     ledger::GetFirstContributionQueueCallback callback) override;
 
+  void InsertOrUpdatePromotion(
+      ledger::PromotionPtr info,
+      ledger::ResultCallback callback) override;
+
+  void GetPromotion(
+      const std::string& id,
+      ledger::GetPromotionCallback callback) override;
+
+  void GetAllPromotions(
+      ledger::GetAllPromotionsCallback callback) override;
+
+  void InsertOrUpdateUnblindedToken(
+      ledger::UnblindedTokenPtr info,
+      ledger::ResultCallback callback) override;
+
+  void GetAllUnblindedTokens(
+      ledger::GetAllUnblindedTokensCallback callback) override;
+
+  void DeleteUnblindedTokens(
+    const std::vector<std::string>& id_list,
+    ledger::ResultCallback callback) override;
+
+  void DeleteUnblindedTokensForPromotion(
+      const std::string& promotion_id,
+      ledger::ResultCallback callback) override;
+
+  ledger::ClientInfoPtr GetClientInfo() override;
+
+  void UnblindedTokensReady() override;
+
+  void GetTransactionReport(
+      const ledger::ActivityMonth month,
+      const int year,
+      ledger::GetTransactionReportCallback callback) override;
+
+  void GetContributionReport(
+      const ledger::ActivityMonth month,
+      const int year,
+      ledger::GetContributionReportCallback callback) override;
+
+  void GetIncompleteContributions(
+      ledger::GetIncompleteContributionsCallback callback) override;
+
+  void GetContributionInfo(
+      const std::string& contribution_id,
+      ledger::GetContributionInfoCallback callback) override;
+
+  void UpdateContributionInfoStepAndCount(
+      const std::string& contribution_id,
+      const ledger::ContributionStep step,
+      const int32_t retry_count,
+      ledger::ResultCallback callback) override;
+
+  void UpdateContributionInfoContributedAmount(
+      const std::string& contribution_id,
+      const std::string& publisher_key,
+      ledger::ResultCallback callback) override;
+
+  void ReconcileStampReset() override;
+
   // end ledger::LedgerClient
 
   // Mojo Proxy methods
   void OnGetTransactionHistory(
       GetTransactionHistoryCallback callback,
       const std::string& transactions);
-  void OnGetAllBalanceReports(
-      const GetAllBalanceReportsCallback& callback,
-      const base::flat_map<std::string, ledger::BalanceReportInfoPtr> reports);
-  void OnGetCurrentBalanceReport(
-      bool success, ledger::BalanceReportInfoPtr report);
   void OnGetAutoContributeProps(
       const GetAutoContributePropsCallback& callback,
       ledger::AutoContributePropsPtr props);
@@ -735,14 +821,63 @@ class RewardsServiceImpl : public RewardsService,
     ledger::GetFirstContributionQueueCallback callback,
     ledger::ContributionQueuePtr info);
 
+  void OnGetPromotion(
+      ledger::GetPromotionCallback callback,
+      ledger::PromotionPtr info);
+
+  void OnGetAllUnblindedTokens(
+      ledger::GetAllUnblindedTokensCallback callback,
+      ledger::UnblindedTokenList list);
+
+  void OnGetAllPromotions(
+      ledger::GetAllPromotionsCallback callback,
+      ledger::PromotionMap promotions);
+
+  void OnGetBalanceReport(
+      GetBalanceReportCallback callback,
+      const ledger::Result result,
+      ledger::BalanceReportInfoPtr report);
+
+  void OnGetMonthlyReportBalance(
+      const uint32_t month,
+      const uint32_t year,
+      GetMonthlyReportCallback callback,
+      const ledger::Result result,
+      ledger::BalanceReportInfoPtr report);
+
+  void OnGetMonthlyReportTransaction(
+      const uint32_t month,
+      const uint32_t year,
+      const MonthlyReport& report,
+      GetMonthlyReportCallback callback,
+      ledger::TransactionReportInfoList list);
+
+  void OnGetMonthlyReportContribution(
+      const MonthlyReport& report,
+      GetMonthlyReportCallback callback,
+      ledger::ContributionReportInfoList list);
+
+  void OnGetTransactionReport(
+      ledger::GetTransactionReportCallback callback,
+      ledger::TransactionReportInfoList list);
+
+  void OnGetContributionReport(
+      ledger::GetContributionReportCallback callback,
+      ledger::ContributionReportInfoList list);
+
+  void OnGetNotCompletedContributions(
+      ledger::GetIncompleteContributionsCallback callback,
+      ledger::ContributionInfoList list);
+
+  void OnGetContributionInfo(
+      ledger::GetContributionInfoCallback callback,
+      ledger::ContributionInfoPtr info);
+
 #if defined(OS_ANDROID)
   ledger::Environment GetServerEnvironmentForAndroid();
   void CreateWalletAttestationResult(
       bat_ledger::mojom::BatLedger::CreateWalletCallback callback,
       bool result, const std::string& result_string);
-  void FetchGrantAttestationResult(const std::string& lang,
-                                const std::string& payment_id,
-                                bool result, const std::string& result_string);
   void GrantAttestationResult(
       const std::string& promotion_id, bool result,
       const std::string& result_string);
@@ -753,7 +888,7 @@ class RewardsServiceImpl : public RewardsService,
   mojo::AssociatedBinding<bat_ledger::mojom::BatLedgerClient>
       bat_ledger_client_binding_;
   bat_ledger::mojom::BatLedgerAssociatedPtr bat_ledger_;
-  bat_ledger::mojom::BatLedgerServicePtr bat_ledger_service_;
+  mojo::Remote<bat_ledger::mojom::BatLedgerService> bat_ledger_service_;
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   std::unique_ptr<ExtensionRewardsServiceObserver>

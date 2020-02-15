@@ -19,6 +19,10 @@
     "message": "Sekarang anda boleh memperoleh token dengan menonton iklan yang menghormati privasi.",
     "description": "Entry text for welcome screen in the panel, new user"
   },
+  "welcomeDescPoints": {
+    "message": "Anda kini boleh memperoleh mata kerana menonton iklan yang menghormati privasi.",
+    "description": "Entry text for welcome screen in the panel, points"
+  },
   "welcomeFooterTextOne": {
     "message": "Lihat peningkatan yang telah dilakukan",
     "description": "Link in the footer (takes you to rewards settings page) for welcome screen in the panel, existing user"
@@ -42,6 +46,22 @@
   "grants": {
     "message": "Geran",
     "description": "Title for grant section in wallet summary"
+  },
+  "details": {
+    "message": "Butiran",
+    "description": "Title for grant section in wallet panel summary"
+  },
+  "yourBalance": {
+    "message": "Baki Anda",
+    "description": "Wallet panel title for anon wallets"
+  },
+  "batPoints": {
+    "message": "Mata BAT",
+    "description": "BAT Points text"
+  },
+  "batPointsMessage": {
+    "message": "boleh digunakan dalam Ganjaran Brave untuk menyumbang kepada pencipta kandungan kegemaran anda. Mata BAT tidak boleh ditukar kepada BAT.",
+    "description": "Text for BAT Point helper message"
   },
   "on": {
     "message": "pada",
@@ -128,12 +148,22 @@
     "description": "Month"
   },
   "tokenGrant": {
-    "message": "Pemberian Token",
-    "description": "Title for grant notification"
+    "message": "Geran $currency$",
+    "description": "Title for grant notification",
+    "placeholders": {
+      "currency": {
+        "content": "$1",
+        "example": "Token"
+      }
+    }
   },
   "tokenGrantClaimed": {
     "message": "Pemberian Token Dituntut",
     "description": "Title for grant section in wallet summary"
+  },
+  "pointGrantClaimed": {
+    "message": "Geran Mata Dituntut",
+    "description": "Title for point grant section in wallet summary"
   },
   "earningsAds": {
     "message": "Pendapatan daripada Iklan",
@@ -152,8 +182,8 @@
     "description": "Used for grant representation. Whole string is '30.0 BAT expires on 08/05/2022'"
   },
   "recurringDonations": {
-    "message": "Tip bulanan",
-    "description": "Title for monthly tips section in wallet summary"
+    "message": "Sumbangan Bulanan",
+    "description": "Title for monthly contributions section in wallet summary"
   },
   "off": {
     "message": "Padam",
@@ -180,12 +210,16 @@
     "description": "Notification title when we display info about auto contribution"
   },
   "contributeNotificationSuccess": {
-    "message": "Anda telah menyumbang $amount$ BAT",
+    "message": "Anda telah menyumbang sebanyak $amount$ $currency$",
     "description": "We show this string in the notification when contribution is successful",
     "placeholders": {
       "amount": {
         "content": "$1",
         "example": "10.0"
+      },
+      "currency": {
+        "content": "$2",
+        "example": "BAT"
       }
     }
   },
@@ -222,7 +256,7 @@
     "description": "We show this string in notification when contribution fails"
   },
   "contributeNotificationNotEnoughFunds": {
-    "message": "Bayaran bulanan berjadual anda untuk Auto-Sumbang dan tip bulanan tidak dapat dilengkapkan kerana kekurangan dana. Kami akan mencuba lagi dalam tempoh 30 hari.",
+    "message": "Bayaran bulanan anda yang dijadualkan untuk Auto-Contribute dan sumbangan bulanan tidak dapat dilakukan kerana dana tidak mencukupi. Kami akan cuba lagi dalam masa 30 hari.",
     "description": "We show this string in the notification when you don't have enough funds for contribution"
   },
   "contributeNotificationTipError": {
@@ -261,10 +295,6 @@
     "message": "Tarikh Luput Pemberian",
     "description": "Grant expiry label"
   },
-  "grantAlreadyClaimedText": {
-    "message": "Maaf, kelihatannya pemberian ini telahpun dituntut.",
-    "description": "Description of the error when grant is already claimed."
-  },
   "grantGeneralErrorButton": {
     "message": "OK",
     "description": "Button text for clearing the error."
@@ -276,18 +306,6 @@
   "grantGeneralErrorTitle": {
     "message": "Maaf, berlaku kesilapan. Sila cuba sebentar lagi.",
     "description": "Error title when user is having problems claiming a grant."
-  },
-  "grantGoneButton": {
-    "message": "OK",
-    "description": "Button text for clearing the error."
-  },
-  "grantGoneText": {
-    "message": "Maaf, kelihatannya pemberian ini telah luput.",
-    "description": "Error text when user missed a grant."
-  },
-  "grantGoneTitle": {
-    "message": "Pemberian ini tidak lagi tersedia.",
-    "description": "Error title when user missed a grant."
   },
   "unVerifiedCheck": {
     "message": "Segar Semula Status",
@@ -306,7 +324,7 @@
     "description": "Text for the link that explains more about reserved amount"
   },
   "reservedAmountText": {
-    "message": "Anda telah menetapkan {{reservedAmount}} BAT untuk pencipta yang masih belum mendaftar untuk menerima sumbangan. Penyemak imbas anda akan terus cuba untuk menyumbang sehingga mereka mengesahkan, atau sehingga 90 hari telah berlalu.",
+    "message": "Anda telah memperuntukkan {{reservedAmount}} {{currency}} untuk pencipta yang belum lagi mendaftar untuk menerima sumbangan. Pelayar anda akan terus menyumbang hinggalah mereka mengesahkan akaun mereka, atau hinggalah 90 hari berlalu.",
     "description": "Notification about how much BAT do you have reserved"
   },
   "reservedMoreLink": {
@@ -382,12 +400,12 @@
     "description": "Title message for wallet disabled panel"
   },
   "tipsProcessedNotification": {
-    "message": "Tip bulanan anda telah diproses!",
-    "description": "Message for monthly tips processed notification"
+    "message": "Sumbangan bulanan anda telah diproses!",
+    "description": "Message for monthly contributions processed notification"
   },
   "contributionTips": {
     "message": "Sumbangan & Tip",
-    "description": "Title for monthly tips processed notification"
+    "description": "Title for monthly contributions processed notification"
   },
   "serviceTextPanelWelcome": {
     "message": "Dengan mengklik 'Sertai Ganjaran', anda menunjukkan yang anda telah membaca dan bersetuju dengan",
@@ -396,6 +414,10 @@
   "bat": {
     "message": "BAT",
     "description": "BAT text for displaying converted tip amount."
+  },
+  "bap": {
+    "message": "BAP",
+    "description": "BAT Points abbreviation text"
   },
   "turnOnAds": {
     "message": "Hidupkan Iklan",
@@ -452,23 +474,33 @@
     "description": "Cosmetic text upon captcha success"
   },
   "grantFinishTextUGP": {
-    "message": "Pemberian token anda sedang dilaksanakan.",
-    "description": "Cosmetic text indicating grant funds are on the way"
+    "message": "Geran $currency$ anda sedang dalam perjalanan.",
+    "description": "Cosmetic text indicating grant funds are on the way",
+    "placeholders": {
+      "currency": {
+        "content": "$1",
+        "example": "token"
+      }
+    }
   },
   "grantFinishTokenTitleUGP": {
     "message": "Pemberian Token Percuma",
     "description": "Token title on success screen"
   },
+  "grantFinishPointTitleUGP": {
+    "message": "Geran Mata Percuma",
+    "description": "Point title on success screen"
+  },
   "grantFinishTitleAds": {
-    "message": "Ganjaran Iklan Brave",
+    "message": "Anda telah memperoleh Ganjaran Iklan!",
     "description": "Cosmetic text upon captcha success for ads"
   },
   "grantFinishTextAds": {
-    "message": "Ganjaran anda yang diperoleh daripada Iklan Brave sedang diproses.",
+    "message": "Ganjaran anda dalam perjalanan ke dompet Ganjaran Brave anda.",
     "description": "Cosmetic text indicating ads funds are on the way"
   },
   "grantFinishTokenTitleAds": {
-    "message": "Pemberian Token Iklan Brave Anda",
+    "message": "Amaun Ganjaran Anda",
     "description": "Token title on success screen for ads"
   },
   "rewardsPanelTextVerify":  {
@@ -532,5 +564,29 @@
   "set": {
     "message": "Tetapkan...",
     "description": "Button text for setting monthly contribution"
+  },
+  "tokens":  {
+    "message": "token",
+    "description": "Standard tokens text"
+  },
+  "point":  {
+    "message": "Mata",
+    "description": "BAT Point text"
+  },
+  "token":  {
+    "message": "Token",
+    "description": "BAT Token text"
+  },
+  "points":  {
+    "message": "mata",
+    "description": "BAT Points text"
+  },
+  "tokenGrants":  {
+    "message": "Pemberian Token",
+    "description": "BAT Tokens Grant Text"
+  },
+  "pointGrants":  {
+    "message": "Geran Mata",
+    "description": "BAT Points Grant Text"
   }
 }

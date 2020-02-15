@@ -29,8 +29,23 @@ export class App extends React.Component<Props, {}> {
     return this.props.actions
   }
 
+  componentDidMount () {
+    this.actions.onlyAnonWallet()
+  }
+
   getTipBanner = (url: string, publisher: RewardsTip.Publisher, mediaMetaData: RewardsTip.MediaMetaData | undefined) => {
+    let monthlyDate
+
+    const {
+      currentTipAmount,
+      currentTipRecurring,
+      reconcileStamp
+    } = this.props.rewardsDonateData
     const monthly = this.props.dialogArgs.monthly
+
+    if (currentTipRecurring && reconcileStamp) {
+      monthlyDate = new Date(reconcileStamp * 1000).toLocaleDateString()
+    }
 
     if (!mediaMetaData) {
       return (
@@ -38,6 +53,8 @@ export class App extends React.Component<Props, {}> {
           url={url}
           monthly={monthly}
           publisher={publisher}
+          monthlyDate={monthlyDate}
+          amount={currentTipAmount}
         />
       )
     } else {
@@ -47,6 +64,8 @@ export class App extends React.Component<Props, {}> {
           monthly={monthly}
           publisher={publisher}
           mediaMetaData={mediaMetaData}
+          monthlyDate={monthlyDate}
+          amount={currentTipAmount}
         />
       )
     }

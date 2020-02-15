@@ -15,26 +15,33 @@ import org.chromium.base.Log;
 import org.chromium.base.ObservableSupplier;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ActivityTabProvider;
+import org.chromium.chrome.browser.BraveFeatureList;
+import org.chromium.chrome.browser.bookmarks.BookmarkBridge;
+import org.chromium.chrome.browser.ChromeFeatureList;
 import org.chromium.chrome.browser.compositor.layouts.OverviewModeBehavior;
 import org.chromium.chrome.browser.multiwindow.MultiWindowModeStateDispatcher;
 import org.chromium.chrome.browser.notifications.BraveSetDefaultBrowserNotificationService;
+import org.chromium.chrome.browser.preferences.BravePrefServiceBridge;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.toolbar.ToolbarManager;
+import org.chromium.chrome.browser.ui.appmenu.AppMenuHandler;
 
 public class BraveAppMenuPropertiesDelegateImpl extends AppMenuPropertiesDelegateImpl {
     private Menu mMenu;
 
-    public BraveAppMenuPropertiesDelegateImpl(Context context, ActivityTabProvider activityTabProvider,
+    public BraveAppMenuPropertiesDelegateImpl(Context context,
+            ActivityTabProvider activityTabProvider,
             MultiWindowModeStateDispatcher multiWindowModeStateDispatcher,
             TabModelSelector tabModelSelector, ToolbarManager toolbarManager, View decorView,
-            @Nullable ObservableSupplier<OverviewModeBehavior> overviewModeBehaviorSupplier) {
+            @Nullable ObservableSupplier<OverviewModeBehavior> overviewModeBehaviorSupplier,
+            ObservableSupplier<BookmarkBridge> bookmarkBridgeSupplier) {
         super(context, activityTabProvider, multiWindowModeStateDispatcher, tabModelSelector,
-              toolbarManager, decorView, overviewModeBehaviorSupplier);
+                toolbarManager, decorView, overviewModeBehaviorSupplier, bookmarkBridgeSupplier);
     }
 
     @Override
-    public void prepareMenu(Menu menu) {
-        super.prepareMenu(menu);
+    public void prepareMenu(Menu menu, AppMenuHandler handler) {
+        super.prepareMenu(menu, handler);
 
         mMenu = menu;
 
@@ -48,7 +55,10 @@ public class BraveAppMenuPropertiesDelegateImpl extends AppMenuPropertiesDelegat
         menu.findItem(R.id.help_id).setVisible(false).setEnabled(false);
 
         menu.add(Menu.NONE, R.id.set_default_browser, 0, R.string.menu_set_default_browser);
-        menu.add(Menu.NONE, R.id.brave_rewards_id, 0, R.string.menu_brave_rewards);
+        if (ChromeFeatureList.isEnabled(BraveFeatureList.BRAVE_REWARDS) &&
+                !BravePrefServiceBridge.getInstance().getSafetynetCheckFailed()) {
+            menu.add(Menu.NONE, R.id.brave_rewards_id, 0, R.string.menu_brave_rewards);
+        }
         menu.add(Menu.NONE, R.id.exit_id, 0, R.string.menu_exit);
 
         if (BraveSetDefaultBrowserNotificationService.isBraveSetAsDefaultBrowser(mContext)) {

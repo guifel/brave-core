@@ -1,0 +1,12 @@
+diff --git a/services/network/public/cpp/BUILD.gn b/services/network/public/cpp/BUILD.gn
+index 370122e95e99f3be6ba11837f04c864f64cbceab..95f7177010fb591f0687d4095ea49ccd2db387e9 100644
+--- a/services/network/public/cpp/BUILD.gn
++++ b/services/network/public/cpp/BUILD.gn
+@@ -109,6 +109,7 @@ jumbo_component("cpp") {
+     "//services/proxy_resolver/public/mojom",
+   ]
+ 
++  public_deps += [ "//brave/services/network/public/cpp" ]
+   defines = [ "IS_NETWORK_CPP_IMPL" ]
+ 
+   if (is_chromecast) {

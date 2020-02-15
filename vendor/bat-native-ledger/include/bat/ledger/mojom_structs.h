@@ -31,8 +31,21 @@ using BalancePtr = mojom::BalancePtr;
 using BalanceReportInfo = mojom::BalanceReportInfo;
 using BalanceReportInfoPtr = mojom::BalanceReportInfoPtr;
 
+using ClientInfo = mojom::ClientInfo;
+using ClientInfoPtr = mojom::ClientInfoPtr;
+
 using ContributionInfo = mojom::ContributionInfo;
 using ContributionInfoPtr = mojom::ContributionInfoPtr;
+using ContributionInfoList = std::vector<ContributionInfoPtr>;
+
+using ContributionPublisher = mojom::ContributionPublisher;
+using ContributionPublisherPtr = mojom::ContributionPublisherPtr;
+using ContributionPublisherList =
+    std::vector<ledger::mojom::ContributionPublisherPtr>;
+
+using ContributionReportInfo = mojom::ContributionReportInfo;
+using ContributionReportInfoPtr = mojom::ContributionReportInfoPtr;
+using ContributionReportInfoList = std::vector<ContributionReportInfoPtr>;
 
 using ContributionQueue = ledger::mojom::ContributionQueue;
 using ContributionQueuePtr = ledger::mojom::ContributionQueuePtr;
@@ -46,6 +59,8 @@ using ContributionQueuePublisherList =
 
 using ContributionRetry = mojom::ContributionRetry;
 
+using ContributionStep = mojom::ContributionStep;
+
 using Environment = ledger::mojom::Environment;
 
 using ExcludeFilter = mojom::ExcludeFilter;
@@ -53,11 +68,12 @@ using ExcludeFilter = mojom::ExcludeFilter;
 using ExternalWallet = mojom::ExternalWallet;
 using ExternalWalletPtr = mojom::ExternalWalletPtr;
 
-using Grant = mojom::Grant;
-using GrantPtr = mojom::GrantPtr;
-
 using MediaEventInfo = mojom::MediaEventInfo;
 using MediaEventInfoPtr = mojom::MediaEventInfoPtr;
+
+using OperatingSystem = mojom::OperatingSystem;
+
+using Platform = mojom::Platform;
 
 using PendingContribution = mojom::PendingContribution;
 using PendingContributionPtr = mojom::PendingContributionPtr;
@@ -66,6 +82,18 @@ using PendingContributionList = std::vector<PendingContributionPtr>;
 using PendingContributionInfo = mojom::PendingContributionInfo;
 using PendingContributionInfoPtr = mojom::PendingContributionInfoPtr;
 using PendingContributionInfoList = std::vector<PendingContributionInfoPtr>;
+
+using Promotion = mojom::Promotion;
+using PromotionPtr = mojom::PromotionPtr;
+using PromotionList = std::vector<PromotionPtr>;
+using PromotionMap = std::map<std::string, PromotionPtr>;
+
+using PromotionType = mojom::PromotionType;
+
+using PromotionCreds = mojom::PromotionCreds;
+using PromotionCredsPtr = mojom::PromotionCredsPtr;
+
+using PromotionStatus = mojom::PromotionStatus;
 
 using PublisherBanner = mojom::PublisherBanner;
 using PublisherBannerPtr = mojom::PublisherBannerPtr;
@@ -79,6 +107,9 @@ using PublisherExclude = mojom::PublisherExclude;
 
 using ReconcileInfo = mojom::ReconcileInfo;
 using ReconcileInfoPtr = mojom::ReconcileInfoPtr;
+
+using RecurringTip = mojom::RecurringTip;
+using RecurringTipPtr = mojom::RecurringTipPtr;
 
 using ReportType = mojom::ReportType;
 
@@ -96,6 +127,14 @@ using ServerPublisherInfoList = std::vector<ServerPublisherInfoPtr>;
 using TransferFee = mojom::TransferFee;
 using TransferFeePtr = mojom::TransferFeePtr;
 using TransferFeeList = std::map<std::string, TransferFeePtr>;
+
+using TransactionReportInfo = mojom::TransactionReportInfo;
+using TransactionReportInfoPtr = mojom::TransactionReportInfoPtr;
+using TransactionReportInfoList = std::vector<TransactionReportInfoPtr>;
+
+using UnblindedToken = mojom::UnblindedToken;
+using UnblindedTokenPtr = mojom::UnblindedTokenPtr;
+using UnblindedTokenList = std::vector<UnblindedTokenPtr>;
 
 using UrlMethod = mojom::UrlMethod;
 

@@ -19,6 +19,10 @@
     "message": "Agora você pode ganhar tokens por assistir a anúncios que respeitam a privacidade.",
     "description": "Entry text for welcome screen in the panel, new user"
   },
+  "welcomeDescPoints": {
+    "message": "Agora você pode ganhar pontos por ver anúncios que respeitam a privacidade.",
+    "description": "Entry text for welcome screen in the panel, points"
+  },
   "welcomeFooterTextOne": {
     "message": "Confira o que foi aprimorado",
     "description": "Link in the footer (takes you to rewards settings page) for welcome screen in the panel, existing user"
@@ -42,6 +46,22 @@
   "grants": {
     "message": "Doações",
     "description": "Title for grant section in wallet summary"
+  },
+  "details": {
+    "message": "Detalhes",
+    "description": "Title for grant section in wallet panel summary"
+  },
+  "yourBalance": {
+    "message": "Seu saldo",
+    "description": "Wallet panel title for anon wallets"
+  },
+  "batPoints": {
+    "message": "Pontos BAT",
+    "description": "BAT Points text"
+  },
+  "batPointsMessage": {
+    "message": "podem ser usadas no Brave Rewards para contribuir com seus criadores de conteúdo favoritos. Não é possível trocar pontos BAT por BAT.",
+    "description": "Text for BAT Point helper message"
   },
   "on": {
     "message": "ativado",
@@ -128,12 +148,22 @@
     "description": "Month"
   },
   "tokenGrant": {
-    "message": "Concessões de Token",
-    "description": "Title for grant notification"
+    "message": "Concessões de $currency$",
+    "description": "Title for grant notification",
+    "placeholders": {
+      "currency": {
+        "content": "$1",
+        "example": "Token"
+      }
+    }
   },
   "tokenGrantClaimed": {
     "message": "Auxílios Token Reivindicados",
     "description": "Title for grant section in wallet summary"
+  },
+  "pointGrantClaimed": {
+    "message": "Concessões de Pontos Reivindicadas",
+    "description": "Title for point grant section in wallet summary"
   },
   "earningsAds": {
     "message": "Ganhos de Anúncios",
@@ -152,8 +182,8 @@
     "description": "Used for grant representation. Whole string is '30.0 BAT expires on 08/05/2022'"
   },
   "recurringDonations": {
-    "message": "Doações Mensais",
-    "description": "Title for monthly tips section in wallet summary"
+    "message": "Contribuições mensais",
+    "description": "Title for monthly contributions section in wallet summary"
   },
   "off": {
     "message": "Desativada",
@@ -180,12 +210,16 @@
     "description": "Notification title when we display info about auto contribution"
   },
   "contributeNotificationSuccess": {
-    "message": "Você contribuiu com $amount$ BAT",
+    "message": "Você contribuiu $amount$ $currency$",
     "description": "We show this string in the notification when contribution is successful",
     "placeholders": {
       "amount": {
         "content": "$1",
         "example": "10.0"
+      },
+      "currency": {
+        "content": "$2",
+        "example": "BAT"
       }
     }
   },
@@ -222,7 +256,7 @@
     "description": "We show this string in notification when contribution fails"
   },
   "contributeNotificationNotEnoughFunds": {
-    "message": "Seu pagamento mensal agendado para Contribuição Automática e doações mensais não pôde ser concluído devido a fundos insuficientes. Nós tentaremos novamente em 30 dias.",
+    "message": "Não foi possível concluir seu pagamento mensal agendado para Contribuição Automática e contribuições mensais devido a fundos insuficientes. Tentaremos novamente em 30 dias.",
     "description": "We show this string in the notification when you don't have enough funds for contribution"
   },
   "contributeNotificationTipError": {
@@ -261,10 +295,6 @@
     "message": "Data de Validade do Auxílio",
     "description": "Grant expiry label"
   },
-  "grantAlreadyClaimedText": {
-    "message": "Sinto muito, parece que esse auxílio já foi reivindicado.",
-    "description": "Description of the error when grant is already claimed."
-  },
   "grantGeneralErrorButton": {
     "message": "Tudo bem",
     "description": "Button text for clearing the error."
@@ -276,18 +306,6 @@
   "grantGeneralErrorTitle": {
     "message": "Opa, algo está errado. Tente novamente mais tarde.",
     "description": "Error title when user is having problems claiming a grant."
-  },
-  "grantGoneButton": {
-    "message": "Tudo Bem",
-    "description": "Button text for clearing the error."
-  },
-  "grantGoneText": {
-    "message": "Sinto muito, parece que esse auxílio já expirou.",
-    "description": "Error text when user missed a grant."
-  },
-  "grantGoneTitle": {
-    "message": "Esse auxílio não está mais disponível.",
-    "description": "Error title when user missed a grant."
   },
   "unVerifiedCheck": {
     "message": "Atualizar Status",
@@ -306,7 +324,7 @@
     "description": "Text for the link that explains more about reserved amount"
   },
   "reservedAmountText": {
-    "message": "Você designou {{reservedAmount}} BAT para criadores de conteúdo que ainda não se inscreveram para receber contribuições. Seu navegador vai tentar realizar a contribuição até que eles sejam verificados ou até que 90 dias tenham se passado.",
+    "message": "Você definiu {{ReservedAmount}} {{currency}} para criadores que ainda não se inscreveram para receber contribuições. Seu navegador vai continuar tentando contribuir até que eles sejam verificados ou até que se passem 90 dias.",
     "description": "Notification about how much BAT do you have reserved"
   },
   "reservedMoreLink": {
@@ -382,12 +400,12 @@
     "description": "Title message for wallet disabled panel"
   },
   "tipsProcessedNotification": {
-    "message": "Suas dicas mensais foram processadas!",
-    "description": "Message for monthly tips processed notification"
+    "message": "Suas contribuições mensais foram processadas!",
+    "description": "Message for monthly contributions processed notification"
   },
   "contributionTips": {
     "message": "Contribuições e Dicas",
-    "description": "Title for monthly tips processed notification"
+    "description": "Title for monthly contributions processed notification"
   },
   "serviceTextPanelWelcome": {
     "message": "Ao clicar em \"Aderir às recompensas\", você indica que leu e concorda com o",
@@ -396,6 +414,10 @@
   "bat": {
     "message": "BAT",
     "description": "BAT text for displaying converted tip amount."
+  },
+  "bap": {
+    "message": "BAP",
+    "description": "BAT Points abbreviation text"
   },
   "turnOnAds": {
     "message": "Ativar anúncios",
@@ -452,23 +474,33 @@
     "description": "Cosmetic text upon captcha success"
   },
   "grantFinishTextUGP": {
-    "message": "Seu auxílio token está a caminho.",
-    "description": "Cosmetic text indicating grant funds are on the way"
+    "message": "Sua concessão de $currency$ está a caminho.",
+    "description": "Cosmetic text indicating grant funds are on the way",
+    "placeholders": {
+      "currency": {
+        "content": "$1",
+        "example": "token"
+      }
+    }
   },
   "grantFinishTokenTitleUGP": {
     "message": "Auxílio Token Gratuito",
     "description": "Token title on success screen"
   },
+  "grantFinishPointTitleUGP": {
+    "message": "Concessão de Pontos Grátis",
+    "description": "Point title on success screen"
+  },
   "grantFinishTitleAds": {
-    "message": "Recompensas do Brave Ads!",
+    "message": "Você ganhou uma Recompensa de Anúncios!",
     "description": "Cosmetic text upon captcha success for ads"
   },
   "grantFinishTextAds": {
-    "message": "O montante da sua recompensa do Brave Ads está sendo liberado.",
+    "message": "Sua recompensa vai chegar em breve na sua carteira Brave Rewards.",
     "description": "Cosmetic text indicating ads funds are on the way"
   },
   "grantFinishTokenTitleAds": {
-    "message": "Sua Quantia de Tokens do Brave Ads",
+    "message": "Seu total de recompensas",
     "description": "Token title on success screen for ads"
   },
   "rewardsPanelTextVerify":  {
@@ -532,5 +564,29 @@
   "set": {
     "message": "Definir...",
     "description": "Button text for setting monthly contribution"
+  },
+  "tokens":  {
+    "message": "tokens",
+    "description": "Standard tokens text"
+  },
+  "point":  {
+    "message": "Ponto",
+    "description": "BAT Point text"
+  },
+  "token":  {
+    "message": "Token",
+    "description": "BAT Token text"
+  },
+  "points":  {
+    "message": "pontos",
+    "description": "BAT Points text"
+  },
+  "tokenGrants":  {
+    "message": "Concessões de Token",
+    "description": "BAT Tokens Grant Text"
+  },
+  "pointGrants":  {
+    "message": "Concessões de Pontos",
+    "description": "BAT Points Grant Text"
   }
 }

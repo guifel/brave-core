@@ -12,6 +12,9 @@
   <release seq="1">
     <includes>
       <part file="fonts_resources.grdp" />
+      <if expr="not is_android and not is_ios">
+        <part file="br_elements_resources_v3.grdp" />
+      </if>
     </includes>
 
     <structures>
@@ -22,7 +25,7 @@
       <structure name="IDR_BRAVE_WEBUI_CSS_MD_COLORS"
              file="css/md_colors.css" type="chrome_html" compress="gzip" />
       <structure name="IDR_BRAVE_WEBUI_CSS_TEXT_DEFAULTS"
-             file="css/text_defaults.css" type="chrome_html" />
+             file="css/text_defaults.css" type="chrome_html" compress="gzip" />
       <structure name="IDR_BRAVE_WEBUI_POLYMER_OVERRIDING_HTML"
              file="polymer_overriding.html" type="chrome_html" compress="gzip" />
       <structure name="IDR_BRAVE_WEBUI_POLYMER_OVERRIDING_JS"

@@ -76,6 +76,9 @@ NS_SWIFT_NAME(BraveAds)
 /// Whether or not Brave Ads is enabled
 @property (nonatomic, assign, getter=isEnabled) BOOL enabled;
 
+/// Whether or not the user has opted out of conversion tracking
+@property (nonatomic, assign, getter=shouldAllowAdConversionTracking) BOOL allowAdConversionTracking;
+
 /// The max number of ads the user can see in an hour
 @property (nonatomic, assign) NSInteger numberOfAllowableAdsPerHour NS_SWIFT_NAME(adsPerHour);
 
@@ -101,10 +104,19 @@ NS_SWIFT_NAME(BraveAds)
 
 - (nullable BATAdsNotification *)adsNotificationForIdentifier:(NSString *)identifier;
 
+#pragma mark - History
+
+/// Get a list of dates of when the user has viewed ads
+- (NSArray<NSDate *> *)getAdsHistoryDates;
+
+/// Return true if the user has viewed ads in the previous cycle/month
+- (BOOL)hasViewedAdsInPreviousCycle;
+
 #pragma mark - Reporting
 
-/// Report that a page has loaded in the current browser tab, and the HTML is available for analysis
-- (void)reportLoadedPageWithURL:(NSURL *)url html:(NSString *)html;
+/// Report that a page has loaded in the current browser tab, and the inner text
+/// within the page loaded for classification
+- (void)reportLoadedPageWithURL:(NSURL *)url innerText:(NSString *)text;
 
 /// Report that media has started on a tab with a given id
 - (void)reportMediaStartedWithTabId:(NSInteger)tabId NS_SWIFT_NAME(reportMediaStarted(tabId:));

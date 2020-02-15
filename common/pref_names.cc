@@ -28,9 +28,9 @@ const char kUseAlternativeSearchEngineProvider[] =
     "brave.use_alternate_private_search_engine";
 const char kAlternativeSearchEngineProviderInTor[] =
     "brave.alternate_private_search_engine_in_tor";
-const char kBraveThemeType[] = "brave.theme.type";
+const char kBraveThemeType[] = "brave.theme.type";  // deprecated
 const char kUseOverriddenBraveThemeType[] =
-    "brave.theme.use_overridden_brave_theme_type";
+    "brave.theme.use_overridden_brave_theme_type";  // deprecated
 const char kLocationBarIsWide[] = "brave.location_bar_is_wide";
 const char kReferralPromoCode[] = "brave.referral.promo_code";
 const char kReferralDownloadID[] = "brave.referral.download_id";
@@ -48,6 +48,7 @@ const char kNoScriptControlType[] = "brave.no_script_default";
 const char kShieldsAdvancedViewEnabled[] =
     "brave.shields.advanced_view_enabled";
 const char kAdControlType[] = "brave.ad_default";
+const char kGoogleLoginControlType[] = "brave.google_login_default";
 const char kFBEmbedControlType[] = "brave.fb_embed_default";
 const char kTwitterEmbedControlType[] = "brave.twitter_embed_default";
 const char kLinkedInEmbedControlType[] = "brave.linkedin_embed_default";
@@ -68,9 +69,14 @@ const char kBraveEnabledMediaRouter[] = "brave.enable_media_router";
 const char kBraveWalletAES256GCMSivNonce[] =
     "brave.wallet.aes_256_gcm_siv_nonce";
 const char kBraveWalletEncryptedSeed[] = "brave.wallet.encrypted_seed";
-const char kBraveWalletEnabled[] = "brave.wallet.enabled";
+const char kBraveWalletEnabledDeprecated[] = "brave.wallet.enabled";
+const char kBraveWalletPrefVersion[] = "brave.wallet.pref_version";
+const char kBraveWalletWeb3Provider[] = "brave.wallet.web3_provider";
 const char kAlwaysShowBookmarkBarOnNTP[] =
     "brave.always_show_bookmark_bar_on_ntp";
+const char kRemoteDebuggingEnabled[] = "brave.remote_debugging_enabled";
+const char kAutocompleteEnabled[] = "brave.autocomplete_enabled";
+const char kBraveDarkMode[] = "brave.dark_mode";
 const char kMRUCyclingEnabled[] = "brave.mru_cycling_enabled";
 
 #if defined(OS_ANDROID)

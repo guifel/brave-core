@@ -14,26 +14,21 @@ export const defaultState: RewardsExtension.State = {
   walletCreateFailed: false,
   publishers: {},
   walletProperties: {
-    grants: []
+    defaultMonthlyTipChoices: []
   },
-  report: {
-    ads: '0',
-    closing: '0',
-    contribute: '0',
-    deposit: '0',
-    donation: '0',
-    grant: '0',
-    tips: '0',
-    opening: '0',
-    total: '0'
+  balanceReport: {
+    ads: 0.0,
+    contribute: 0.0,
+    donation: 0.0,
+    grant: 0.0,
+    tips: 0.0
   },
   notifications: {},
   currentNotification: undefined,
   pendingContributionTotal: 0,
   enabledMain: false,
   enabledAC: false,
-  grants: [],
-  currentGrant: undefined,
+  promotions: [],
   recurringTips: [],
   tipAmounts: {},
   balance: {

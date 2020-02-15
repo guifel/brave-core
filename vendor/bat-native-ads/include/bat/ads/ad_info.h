@@ -29,10 +29,12 @@ struct ADS_EXPORT AdInfo {
   std::string start_timestamp;
   std::string end_timestamp;
   unsigned int daily_cap;
+  std::string advertiser_id;
   unsigned int per_day;
   unsigned int total_max;
   std::vector<std::string> regions;
   std::string advertiser;
+  std::string category;
   std::string notification_text;
   std::string notification_url;
   std::string uuid;

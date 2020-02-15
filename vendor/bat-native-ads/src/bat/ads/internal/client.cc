@@ -5,7 +5,7 @@
 
 #include "bat/ads/internal/client.h"
 
-#include "bat/ads/ad_history_detail.h"
+#include "bat/ads/ad_history.h"
 #include "bat/ads/internal/classification_helper.h"
 #include "bat/ads/internal/filtered_ad.h"
 #include "bat/ads/internal/filtered_category.h"
@@ -60,9 +60,9 @@ void Client::Initialize(InitializeCallback callback) {
   LoadState();
 }
 
-void Client::AppendAdToAdsShownHistory(
-    const AdHistoryDetail& ad_history_detail) {
-  client_state_->ads_shown_history.push_front(ad_history_detail);
+void Client::AppendAdHistoryToAdsShownHistory(
+    const AdHistory& ad_history) {
+  client_state_->ads_shown_history.push_front(ad_history);
 
   if (client_state_->ads_shown_history.size() >
       kMaximumEntriesInAdsShownHistory) {
@@ -72,7 +72,7 @@ void Client::AppendAdToAdsShownHistory(
   SaveState();
 }
 
-const std::deque<AdHistoryDetail> Client::GetAdsShownHistory() const {
+const std::deque<AdHistory> Client::GetAdsShownHistory() const {
   return client_state_->ads_shown_history;
 }
 
@@ -352,12 +352,39 @@ const std::map<std::string, uint64_t> Client::GetAdsUUIDSeen() {
 
 void Client::ResetAdsUUIDSeen(
     const std::vector<AdInfo>& ads) {
-  BLOG(INFO) << "Resetting seen Ads";
+  BLOG(INFO) << "Resetting seen ads";
 
   for (const auto& ad : ads) {
     auto ad_uuid_seen = client_state_->ads_uuid_seen.find(ad.uuid);
     if (ad_uuid_seen != client_state_->ads_uuid_seen.end()) {
       client_state_->ads_uuid_seen.erase(ad_uuid_seen);
+    }
+  }
+
+  SaveState();
+}
+
+void Client::UpdateAdvertisersUUIDSeen(
+    const std::string& uuid,
+    const uint64_t value) {
+  client_state_->advertisers_uuid_seen.insert({uuid, value});
+
+  SaveState();
+}
+
+const std::map<std::string, uint64_t> Client::GetAdvertisersUUIDSeen() {
+  return client_state_->advertisers_uuid_seen;
+}
+
+void Client::ResetAdvertisersUUIDSeen(
+     const std::vector<AdInfo>& ads) {
+  BLOG(INFO) << "Resetting seen advertisers";
+
+  for (const auto& ad : ads) {
+    auto advertiser_uuid_seen =
+        client_state_->advertisers_uuid_seen.find(ad.advertiser_id);
+    if (advertiser_uuid_seen != client_state_->advertisers_uuid_seen.end()) {
+      client_state_->advertisers_uuid_seen.erase(advertiser_uuid_seen);
     }
   }
 
@@ -515,6 +542,30 @@ const std::map<std::string, std::deque<uint64_t>>
   return client_state_->creative_set_history;
 }
 
+void Client::AppendTimestampToAdConversionHistoryForUuid(
+    const std::string& creative_set_id,
+    const uint64_t timestamp_in_seconds) {
+  DCHECK(!creative_set_id.empty());
+  if (creative_set_id.empty()) {
+    return;
+  }
+
+  if (client_state_->ad_conversion_history.find(creative_set_id) ==
+      client_state_->ad_conversion_history.end()) {
+    client_state_->ad_conversion_history.insert({creative_set_id, {}});
+  }
+
+  client_state_->ad_conversion_history.at(
+      creative_set_id).push_back(timestamp_in_seconds);
+
+  SaveState();
+}
+
+const std::map<std::string, std::deque<uint64_t>>
+    Client::GetAdConversionHistory() const {
+  return client_state_->ad_conversion_history;
+}
+
 void Client::AppendTimestampToCampaignHistoryForUuid(
     const std::string& uuid,
     const uint64_t timestamp_in_seconds) {
@@ -586,6 +637,7 @@ void Client::OnStateLoaded(const Result result, const std::string& json) {
     BLOG(ERROR) << "Failed to load client state, resetting to default values";
 
     client_state_.reset(new ClientState());
+    SaveState();
   } else {
     if (!FromJson(json)) {
       BLOG(ERROR) << "Failed to parse client state: " << json;

@@ -5,16 +5,19 @@
 import * as React from 'react'
 
 // Feature-specific components
-import { Page, Header, Footer, App, PosterBackground, Gradient, ClockWidget as Clock, RewardsWidget as Rewards } from '../../components/default'
+import { ClockWidget as Clock, RewardsWidget as Rewards } from '../../components/default'
+import * as Page from '../../components/default/page'
+import BrandedWallpaperLogo from '../../components/default/brandedWallpaper/logo'
 
 import TopSitesList from './topSites/topSitesList'
 import Stats from './stats'
-import SiteRemovalNotification from './siteRemovalNotification'
+import TopSitesNotification from '../../containers/newTab/notification'
 import FooterInfo from './footerInfo'
 
 // Assets
 import { getRandomBackgroundData } from './helpers'
 import { images } from './data/background'
+import dummyBrandedWallpaper from './data/brandedWallpaper'
 
 const generateRandomBackgroundData = getRandomBackgroundData(images)
 interface State {
@@ -23,21 +26,29 @@ interface State {
   showStats: boolean
   showClock: boolean
   showTopSites: boolean
+  showTopSitesNotification: boolean
   showRewards: boolean
+  brandedWallpaperOptIn: boolean
   adsEstimatedEarnings: number
   balance: NewTab.RewardsBalance
-  grants: NewTab.GrantRecord[]
+  promotions: NewTab.Promotion[]
   enabledAds: boolean
   enabledMain: boolean
-  totalContribution: string
+  totalContribution: number
   walletCreated: boolean
   walletCreating: boolean
   walletCreateFailed: boolean
-  walletCorrupted: boolean
+  walletCorrupted: boolean,
+  isBrandedWallpaperNotificationDismissed: boolean
+  brandedWallpaper?: NewTab.BrandedWallpaper
 }
 
 interface Props {
   textDirection: string
+  showBrandedWallpaper: boolean
+  showTopSitesNotification: boolean
+  isAdsOn: boolean
+  isAdsSupported: boolean
 }
 
 export default class NewTabPage extends React.PureComponent<Props, State> {
@@ -49,26 +60,29 @@ export default class NewTabPage extends React.PureComponent<Props, State> {
       showStats: true,
       showClock: true,
       showTopSites: true,
+      showTopSitesNotification: props.showTopSitesNotification,
       showRewards: true,
+      brandedWallpaperOptIn: true,
       adsEstimatedEarnings: 5,
       enabledAds: false,
       enabledMain: false,
-      grants: [],
+      promotions: [],
       balance: {
         total: 0,
         rates: {},
         wallets: {}
       },
-      totalContribution: '0.0',
+      totalContribution: 0.0,
       walletCreated: false,
       walletCreating: false,
       walletCreateFailed: false,
-      walletCorrupted: false
+      walletCorrupted: false,
+      isBrandedWallpaperNotificationDismissed: false
     }
   }
 
   doNothing = (s: string) => {
-    /* no-op */
+    console.log('doNothing called:', s)
   }
 
   toggleShowBackgroundImage = () => {
@@ -107,6 +121,18 @@ export default class NewTabPage extends React.PureComponent<Props, State> {
     this.setState({ enabledMain: true })
   }
 
+  toggleBrandedWallpaperOptIn = () => {
+    this.setState({ brandedWallpaperOptIn: !this.state.brandedWallpaperOptIn })
+  }
+
+  hideSiteRemovalNotification = () => {
+    this.setState({ showTopSitesNotification: false })
+  }
+
+  onDismissBrandedWallpaperNotification = () => {
+    this.setState({ isBrandedWallpaperNotificationDismissed: true })
+  }
+
   createWallet = () => {
     this.setState({ walletCreating: true })
     setTimeout(() => {
@@ -116,50 +142,107 @@ export default class NewTabPage extends React.PureComponent<Props, State> {
     }, 1000)
   }
 
+  componentDidUpdate (prevProps: Props) {
+    if (!prevProps.showBrandedWallpaper && this.props.showBrandedWallpaper) {
+      const brandedWallpaper = dummyBrandedWallpaper
+      this.setState({ brandedWallpaper })
+    }
+    if (prevProps.showTopSitesNotification !== this.props.showTopSitesNotification) {
+      this.setState({ showTopSitesNotification: this.props.showTopSitesNotification })
+    }
+  }
+
   render () {
     const { showSettingsMenu, showBackgroundImage, showClock, showStats, showTopSites, showRewards } = this.state
     const {
-      enabledAds,
       enabledMain,
       adsEstimatedEarnings,
       walletCorrupted,
       walletCreateFailed,
       walletCreated,
       walletCreating,
-      grants,
+      promotions,
       balance,
       totalContribution
     } = this.state
     const { textDirection } = this.props
 
+    const enabledAds = this.state.enabledAds && this.props.isAdsOn
+
+    const hasImage = showBackgroundImage
+    let imageSource
+    if (hasImage) {
+      imageSource = this.state.brandedWallpaper ? this.state.brandedWallpaper.wallpaperImageUrl : generateRandomBackgroundData.source
+    }
+
+    const showBrandedWallpaper = this.props.showBrandedWallpaper &&
+      this.state.brandedWallpaperOptIn
+
     return (
-      <App dataIsReady={true} dir={textDirection}>
-      <PosterBackground hasImage={showBackgroundImage} imageHasLoaded={true}>
-        {showBackgroundImage && <img src={generateRandomBackgroundData.source} />}
-      </PosterBackground>
-        {showBackgroundImage && <Gradient imageHasLoaded={true} />}
-        <Page>
-          <Header>
+      <Page.App dataIsReady={true}>
+        <Page.PosterBackground
+          hasImage={hasImage}
+          imageHasLoaded={true}
+        >
+          {hasImage &&
+            <img src={imageSource} />
+          }
+        </Page.PosterBackground>
+        {hasImage &&
+          <Page.Gradient
+            imageHasLoaded={true}
+          />
+        }
+        <Page.Page
+          showClock={showClock}
+          showStats={showStats}
+          showRewards={showRewards || showBrandedWallpaper}
+          showTopSites={showTopSites}
+          showBrandedWallpaper={showBrandedWallpaper}
+        >
+          {showStats &&
+          <Page.GridItemStats>
             <Stats
               textDirection={textDirection}
-              showWidget={showStats}
               menuPosition={'right'}
               hideWidget={this.toggleShowStats}
             />
+          </Page.GridItemStats>
+          }
+          {showClock &&
+          <Page.GridItemClock>
             <Clock
               textDirection={textDirection}
-              showWidget={showClock}
               menuPosition={'left'}
               hideWidget={this.toggleShowClock}
             />
+          </Page.GridItemClock>
+          }
+          {showTopSites &&
+          <Page.GridItemTopSites>
             <TopSitesList
               textDirection={textDirection}
-              showWidget={showTopSites}
               menuPosition={'right'}
               hideWidget={this.toggleShowTopSites}
             />
+          </Page.GridItemTopSites>
+          }
+          {this.state.showTopSitesNotification &&
+          <Page.GridItemNotification>
+            <TopSitesNotification
+              actions={{
+                undoSiteIgnored: () => { console.log('undo site ignored') },
+                onUndoAllSiteIgnored: () => { console.log('undo all site ignored') },
+                onHideSiteRemovalNotification: () => this.hideSiteRemovalNotification()
+              }}
+            />
+          </Page.GridItemNotification>
+          }
+          {(showRewards || (showBrandedWallpaper && !this.state.isBrandedWallpaperNotificationDismissed)) &&
+          <Page.GridItemRewards>
             <Rewards
-              grants={grants}
+              adsSupported={this.props.isAdsSupported}
+              promotions={promotions}
               balance={balance}
               enabledAds={enabledAds}
               enabledMain={enabledMain}
@@ -172,36 +255,56 @@ export default class NewTabPage extends React.PureComponent<Props, State> {
               onCreateWallet={this.createWallet}
               onEnableRewards={this.enableRewards}
               textDirection={textDirection}
-              showWidget={showRewards}
               menuPosition={'left'}
               hideWidget={this.toggleShowRewards}
               onDismissNotification={this.doNothing}
+              onDismissBrandedWallpaperNotification={this.onDismissBrandedWallpaperNotification}
               totalContribution={totalContribution}
+              showBrandedWallpaperNotification={!this.state.isBrandedWallpaperNotificationDismissed}
+              brandedWallpaperData={this.state.brandedWallpaper}
+              isShowingBrandedWallpaper={showBrandedWallpaper}
+              isNotification={!showRewards}
+              preventFocus={!showRewards}
+              onDisableBrandedWallpaper={this.doNothing.bind(this, 'onDisableBrandedWallpaper')}
             />
-            <SiteRemovalNotification />
-          </Header>
-          <Footer>
-            <FooterInfo
-              textDirection={textDirection}
-              onClickOutside={this.closeSettings}
-              backgroundImageInfo={generateRandomBackgroundData}
-              onClickSettings={this.toggleSettings}
-              showSettingsMenu={showSettingsMenu}
-              showPhotoInfo={showBackgroundImage}
-              toggleShowBackgroundImage={this.toggleShowBackgroundImage}
-              toggleShowClock={this.toggleShowClock}
-              toggleShowStats={this.toggleShowStats}
-              toggleShowTopSites={this.toggleShowTopSites}
-              toggleShowRewards={this.toggleShowRewards}
-              showBackgroundImage={showBackgroundImage}
-              showClock={showClock}
-              showStats={showStats}
-              showTopSites={showTopSites}
-              showRewards={showRewards}
-            />
-          </Footer>
-        </Page>
-      </App>
+          </Page.GridItemRewards>
+          }
+          <Page.Footer>
+            <Page.FooterContent>
+              {showBrandedWallpaper && this.state.brandedWallpaper &&
+                this.state.brandedWallpaper.logo &&
+              <Page.GridItemBrandedLogo>
+                <BrandedWallpaperLogo
+                  menuPosition={'right'}
+                  textDirection={textDirection}
+                  data={this.state.brandedWallpaper.logo}
+                />
+              </Page.GridItemBrandedLogo>
+              }
+              <FooterInfo
+                textDirection={textDirection}
+                onClickOutside={this.closeSettings}
+                backgroundImageInfo={generateRandomBackgroundData}
+                onClickSettings={this.toggleSettings}
+                showSettingsMenu={showSettingsMenu}
+                showPhotoInfo={!showBrandedWallpaper && showBackgroundImage}
+                toggleShowBackgroundImage={this.toggleShowBackgroundImage}
+                toggleShowClock={this.toggleShowClock}
+                toggleShowStats={this.toggleShowStats}
+                toggleShowTopSites={this.toggleShowTopSites}
+                toggleShowRewards={this.toggleShowRewards}
+                toggleBrandedWallpaperOptIn={this.toggleBrandedWallpaperOptIn}
+                showBackgroundImage={showBackgroundImage}
+                showClock={showClock}
+                showStats={showStats}
+                showTopSites={showTopSites}
+                showRewards={showRewards}
+                brandedWallpaperOptIn={this.state.brandedWallpaperOptIn}
+              />
+            </Page.FooterContent>
+          </Page.Footer>
+        </Page.Page>
+      </Page.App>
     )
   }
 }

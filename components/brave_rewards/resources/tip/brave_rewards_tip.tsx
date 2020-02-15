@@ -11,8 +11,8 @@ require('emptykit.css')
 
 // Components
 import App from './components/app'
-require('../../../fonts/muli.css')
-require('../../../fonts/poppins.css')
+require('../../../../ui/webui/resources/fonts/muli.css')
+require('../../../../ui/webui/resources/fonts/poppins.css')
 
 // Utils
 import store from './store'
@@ -90,6 +90,16 @@ window.cr.define('brave_rewards_tip', function () {
     getActions().onExternalWallet(wallet)
   }
 
+  function onlyAnonWallet (only: boolean) {
+    getActions().onOnlyAnonWallet(only)
+  }
+
+  function reconcileComplete (properties: {type: number, result: number}) {
+    if (properties.result === 0) {
+      getActions().getBalance()
+    }
+  }
+
   return {
     initialize,
     publisherBanner,
@@ -99,7 +109,9 @@ window.cr.define('brave_rewards_tip', function () {
     recurringTipRemoved,
     recurringTipSaved,
     balance,
-    externalWallet
+    externalWallet,
+    onlyAnonWallet,
+    reconcileComplete
   }
 })
 

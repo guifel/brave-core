@@ -1,12 +1,12 @@
 diff --git a/ui/native_theme/native_theme.h b/ui/native_theme/native_theme.h
-index 3604105e43ee1866a8517c52ed05205b3ed10b56..8a5ae89c90e0e074258a14714b74b64447ca42d1 100644
+index d78379d48c341dde6a10788919e0eb3bfb05c54e..cbad0c93bc65fec1fce555cd7d0f526562ae9189 100644
 --- a/ui/native_theme/native_theme.h
 +++ b/ui/native_theme/native_theme.h
-@@ -461,6 +461,7 @@ class NATIVE_THEME_EXPORT NativeTheme {
+@@ -463,6 +463,7 @@ class NATIVE_THEME_EXPORT NativeTheme {
  
    // Returns the system's caption style.
    virtual base::Optional<CaptionStyle> GetSystemCaptionStyle() const;
 +  BRAVE_UI_NATIVE_THEME_NATIVE_THEME_H_
  
-   ColorScheme GetSystemColorScheme() const;
+   virtual ColorScheme GetDefaultSystemColorScheme() const;
  

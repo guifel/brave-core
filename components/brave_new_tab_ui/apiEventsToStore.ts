@@ -90,13 +90,19 @@ chrome.braveRewards.onWalletInitialized.addListener((result: any | NewTab.Reward
 })
 
 chrome.braveRewards.onEnabledMain.addListener((enabledMain: boolean) => {
-  getActions().onEnabledMain(enabledMain)
+  chrome.braveRewards.getAdsEnabled((enabledAds: boolean) => {
+    getActions().onEnabledMain(enabledMain, enabledAds)
+  })
 })
 
 chrome.braveRewards.onAdsEnabled.addListener((enabled: boolean) => {
   getActions().onAdsEnabled(enabled)
 })
 
-chrome.braveRewards.onGrant.addListener((properties: NewTab.GrantResponse) => {
-  getActions().onGrant(properties)
+chrome.braveRewards.onPromotions.addListener((result: number, promotions: NewTab.Promotion[]) => {
+  getActions().onPromotions(result, promotions)
+})
+
+chrome.braveRewards.onPromotionFinish.addListener((result: number, promotion: NewTab.Promotion) => {
+  getActions().onPromotionFinish(result, promotion)
 })

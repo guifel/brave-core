@@ -27,32 +27,37 @@ export const onWalletProperties = (properties: {status: number, wallet: Rewards.
     properties
   })
 
-export const getGrants = () => action(types.GET_GRANTS)
+export const fetchPromotions = () => action(types.FETCH_PROMOTIONS)
 
-export const onGrant = (properties: Rewards.GrantResponse) => action(types.ON_GRANT, {
+export const onPromotions = (properties: Rewards.PromotionResponse) => action(types.ON_PROMOTIONS, {
   properties
 })
 
-export const getGrantCaptcha = (promotionId?: string) => action(types.GET_GRANT_CAPTCHA, {
+export const claimPromotion = (promotionId: string) => action(types.CLAIM_PROMOTION, {
   promotionId
 })
 
-export const onGrantCaptcha = (captcha: Rewards.Captcha) => action(types.ON_GRANT_CAPTCHA, {
-  captcha
+export const onClaimPromotion = (properties: Rewards.Captcha) => action(types.ON_CLAIM_PROMOTION, {
+  properties
 })
 
-export const solveGrantCaptcha = (x: number, y: number) => action(types.SOLVE_GRANT_CAPTCHA, {
+export const attestPromotion = (promotionId: string, x: number, y: number) => action(types.ATTEST_PROMOTION, {
+  promotionId,
   x,
   y
 })
 
-export const onGrantFinish = (properties: Rewards.GrantFinish) => action(types.ON_GRANT_FINISH, {
+export const onPromotionFinish = (properties: Rewards.PromotionFinish) => action(types.ON_PROMOTION_FINISH, {
   properties
 })
 
-export const onResetGrant = () => action(types.ON_GRANT_RESET)
+export const resetPromotion = (promotionId: string) => action(types.RESET_PROMOTION, {
+  promotionId
+})
 
-export const onDeleteGrant = () => action(types.ON_GRANT_DELETE)
+export const deletePromotion = (promotionId: string) => action(types.DELETE_PROMOTION, {
+  promotionId
+})
 
 export const getWalletPassphrase = () => action(types.GET_WALLLET_PASSPHRASE)
 
@@ -88,11 +93,16 @@ export const onExcludedList = (list: Rewards.ExcludedPublisher[]) => action(type
   list
 })
 
-export const onBalanceReports = (reports: Record<string, Rewards.Report>) => action(types.ON_BALANCE_REPORTS, {
-  reports
+export const onBalanceReport = (properties: {month: number, year: number, report: Rewards.BalanceReport}) => action(types.ON_BALANCE_REPORT, {
+  month: properties.month,
+  year: properties.year,
+  report: properties.report
 })
 
-export const getCurrentReport = () => action(types.GET_CURRENT_REPORT, {})
+export const getBalanceReport = (month: number, year: number) => action(types.GET_BALANCE_REPORT, {
+  month,
+  year
+})
 
 export const excludePublisher = (publisherKey: string) => action(types.ON_EXCLUDE_PUBLISHER, {
   publisherKey
@@ -144,7 +154,7 @@ export const onAdsData = (adsData: Rewards.AdsData) => action(types.ON_ADS_DATA,
 
 export const getAdsHistory = () => action(types.GET_ADS_HISTORY)
 
-export const onAdsHistory = (adsHistory: Rewards.AdsHistoryData[]) => action(types.ON_ADS_HISTORY, {
+export const onAdsHistory = (adsHistory: Rewards.AdsHistory[]) => action(types.ON_ADS_HISTORY, {
   adsHistory
 })
 
@@ -243,21 +253,14 @@ export const onRecurringTipRemoved = (success: boolean) => action(types.ON_RECUR
   success
 })
 
-export const onContributionSaved = (properties: Rewards.ContributionSaved) =>
-  action(types.ON_CONTRIBUTION_SAVED, {
-    properties
-  })
-
 export const onInlineTipSettingChange = (key: string, value: boolean) => action(types.ON_INLINE_TIP_SETTINGS_CHANGE, {
   key,
   value
 })
 
-export const removePendingContribution = (publisherKey: string, viewingId: string, addedDate: string) =>
+export const removePendingContribution = (id: number) =>
   action(types.REMOVE_PENDING_CONTRIBUTION, {
-    publisherKey,
-    viewingId,
-    addedDate
+    id
   })
 
 export const removeAllPendingContribution = () => action(types.REMOVE_ALL_PENDING_CONTRIBUTION)
@@ -306,3 +309,17 @@ export const onlyAnonWallet = () => action(types.ONLY_ANON_WALLET)
 export const onOnlyAnonWallet = (only: boolean) => action(types.ON_ONLY_ANON_WALLET, {
   only
 })
+
+export const getMonthlyStatement = (month: number, year: number) => action(types.GET_MONTHLY_REPORT, {
+  month,
+  year
+})
+
+export const onMonthlyReport = (properties: { result: number, month: number, year: number, report: Rewards.MonthlyReport}) => action(types.ON_MONTHLY_REPORT, {
+  result: properties.result,
+  month: properties.month,
+  year: properties.year,
+  report: properties.report
+})
+
+export const onReconcileStampReset = () => action(types.ON_RECONCILE_STAMP_RESET)

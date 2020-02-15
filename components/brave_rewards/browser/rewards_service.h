@@ -19,8 +19,10 @@
 #include "brave/components/brave_rewards/browser/external_wallet.h"
 #include "brave/components/brave_rewards/browser/publisher_banner.h"
 #include "brave/components/brave_rewards/browser/pending_contribution.h"
+#include "brave/components/brave_rewards/browser/promotion.h"
 #include "brave/components/brave_rewards/browser/rewards_internals_info.h"
 #include "brave/components/brave_rewards/browser/rewards_notification_service.h"
+#include "brave/components/brave_rewards/browser/monthly_report.h"
 #include "build/build_config.h"
 #include "components/sessions/core/session_id.h"
 #include "components/keyed_service/core/keyed_service.h"
@@ -51,8 +53,6 @@ class RewardsServicePrivateObserver;
 using GetContentSiteListCallback =
     base::Callback<void(std::unique_ptr<ContentSiteList>,
         uint32_t /* next_record */)>;
-using GetAllBalanceReportsCallback = base::Callback<void(
-    const std::map<std::string, brave_rewards::BalanceReport>&)>;
 using GetWalletPassphraseCallback = base::Callback<void(const std::string&)>;
 using GetContributionAmountCallback = base::Callback<void(double)>;
 using GetAutoContributePropsCallback = base::Callback<void(
@@ -98,6 +98,22 @@ using ProcessRewardsPageUrlCallback = base::OnceCallback<void(
     const std::string&,
     const std::map<std::string, std::string>&)>;
 using CreateWalletCallback = base::OnceCallback<void(int32_t)>;
+using ClaimPromotionCallback = base::OnceCallback<void(
+    const int32_t,
+    const std::string&,
+    const std::string&,
+    const std::string&)>;
+using AttestPromotionCallback = base::OnceCallback<void(
+    const int32_t,
+    std::unique_ptr<brave_rewards::Promotion> promotion)>;
+using GetAnonWalletStatusCallback = base::OnceCallback<void(const uint32_t)>;
+
+using GetBalanceReportCallback = base::OnceCallback<void(
+    const int32_t,
+    const brave_rewards::BalanceReport&)>;
+
+using GetMonthlyReportCallback = base::OnceCallback<void(
+    const MonthlyReport&)>;
 
 class RewardsService : public KeyedService {
  public:
@@ -115,19 +131,21 @@ class RewardsService : public KeyedService {
       uint32_t min_visits,
       bool fetch_excluded,
       const GetContentSiteListCallback& callback) = 0;
-  virtual void FetchGrants(const std::string& lang,
-                           const std::string& paymentId) = 0;
-  virtual void GetGrantCaptcha(
+  virtual void FetchPromotions() = 0;
+  // Used by desktop
+  virtual void ClaimPromotion(ClaimPromotionCallback callback) = 0;
+  // Used by Android
+  virtual void ClaimPromotion(
       const std::string& promotion_id,
-      const std::string& promotion_type) = 0;
-  virtual void SolveGrantCaptcha(const std::string& solution,
-                                 const std::string& promotionId) const = 0;
+      AttestPromotionCallback callback) = 0;
+  virtual void AttestPromotion(
+      const std::string& promotion_id,
+      const std::string& solution,
+      AttestPromotionCallback callback) = 0;
   virtual void GetWalletPassphrase(
       const GetWalletPassphraseCallback& callback) = 0;
   virtual void RecoverWallet(const std::string& passPhrase) = 0;
   virtual void RestorePublishersUI() = 0;
-  virtual void GetGrantViaSafetynetCheck(
-      const std::string& promotion_id) const = 0;
   virtual void OnLoad(SessionID tab_id, const GURL& gurl) = 0;
   virtual void OnUnload(SessionID tab_id) = 0;
   virtual void OnShow(SessionID tab_id) = 0;
@@ -166,9 +184,10 @@ class RewardsService : public KeyedService {
   virtual void SetAutoContribute(bool enabled) = 0;
   virtual void UpdateAdsRewards() const = 0;
   virtual void SetTimer(uint64_t time_offset, uint32_t* timer_id) = 0;
-  virtual void GetAllBalanceReports(
-      const GetAllBalanceReportsCallback& callback) = 0;
-  virtual void GetCurrentBalanceReport() = 0;
+  virtual void GetBalanceReport(
+      const uint32_t month,
+      const uint32_t year,
+      GetBalanceReportCallback callback) = 0;
   virtual void IsWalletCreated(const IsWalletCreatedCallback& callback) = 0;
   virtual void GetPublisherActivityFromUrl(
       uint64_t windowId,
@@ -180,9 +199,9 @@ class RewardsService : public KeyedService {
   virtual void GetPublisherBanner(const std::string& publisher_id,
                                   GetPublisherBannerCallback callback) = 0;
   virtual void OnTip(const std::string& publisher_key,
-                     int amount,
+                     double amount,
                      bool recurring) = 0;
-  virtual void OnTip(const std::string& publisher_key, int amount,
+  virtual void OnTip(const std::string& publisher_key, double amount,
       bool recurring, std::unique_ptr<brave_rewards::ContentSite> site) = 0;
   virtual void RemoveRecurringTipUI(const std::string& publisher_key) = 0;
   virtual void GetRecurringTipsUI(GetRecurringTipsCallback callback) = 0;
@@ -223,9 +242,7 @@ class RewardsService : public KeyedService {
   virtual void GetPendingContributionsUI(
     GetPendingContributionsCallback callback) = 0;
 
-  virtual void RemovePendingContributionUI(const std::string& publisher_key,
-                                         const std::string& viewing_id,
-                                         uint64_t added_date) = 0;
+  virtual void RemovePendingContributionUI(const uint64_t id) = 0;
   virtual void RemoveAllPendingContributionsUI() = 0;
   virtual void ResetTheWholeState(
       const base::Callback<void(bool)>& callback) = 0;
@@ -236,7 +253,7 @@ class RewardsService : public KeyedService {
   static void RegisterProfilePrefs(PrefRegistrySimple* registry);
 
   virtual void SaveRecurringTipUI(const std::string& publisher_key,
-                                  const int amount,
+                                  const double amount,
                                   SaveRecurringTipCallback callback) = 0;
 
   virtual const RewardsNotificationService::RewardsNotificationsMap&
@@ -271,6 +288,13 @@ class RewardsService : public KeyedService {
   virtual void DisconnectWallet(const std::string& wallet_type) = 0;
 
   virtual bool OnlyAnonWallet() = 0;
+
+  virtual void GetAnonWalletStatus(GetAnonWalletStatusCallback callback) = 0;
+
+  virtual void GetMonthlyReport(
+      const uint32_t month,
+      const uint32_t year,
+      GetMonthlyReportCallback callback) = 0;
 
  protected:
   base::ObserverList<RewardsServiceObserver> observers_;

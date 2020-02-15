@@ -1,8 +1,8 @@
 diff --git a/components/policy/tools/generate_policy_source.py b/components/policy/tools/generate_policy_source.py
-index 28db4dd238ad33e4a250d93c1ef90678e5c31ef8..6a308a65e6865f1d77e3761bf7e0661fb5b78130 100755
+index bea559c9908477429b2639a2af420b672d3898ab..b453754a2e81b04ece21c30606b3f63d386c2408 100755
 --- a/components/policy/tools/generate_policy_source.py
 +++ b/components/policy/tools/generate_policy_source.py
-@@ -26,6 +26,7 @@ from xml.sax.saxutils import escape as xml_escape
+@@ -30,6 +30,7 @@ else:
  CHROME_POLICY_KEY = 'SOFTWARE\\\\Policies\\\\Google\\\\Chrome'
  CHROMIUM_POLICY_KEY = 'SOFTWARE\\\\Policies\\\\Chromium'
  
@@ -10,7 +10,7 @@ index 28db4dd238ad33e4a250d93c1ef90678e5c31ef8..6a308a65e6865f1d77e3761bf7e0661f
  
  class PolicyDetails:
    """Parses a policy template and caches all its details."""
-@@ -335,6 +336,7 @@ def main():
+@@ -350,6 +351,7 @@ def main():
      chrome_major_version = ParseVersionFile(version_path)
  
    template_file_contents = _LoadJSONFile(template_file_name)

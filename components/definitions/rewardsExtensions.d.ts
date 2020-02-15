@@ -1,14 +1,13 @@
 declare namespace RewardsExtension {
   interface State {
     balance: Balance
-    currentGrant?: GrantInfo
     currentNotification?: string
     enabledAC: boolean
     enabledMain: boolean
     notifications: Record<string, Notification>
     publishers: Record<string, Publisher>
-    report: Report
-    grants?: GrantInfo[]
+    balanceReport: BalanceReport
+    promotions?: Promotion[]
     pendingContributionTotal: number
     walletCorrupted: boolean
     walletCreated: boolean
@@ -48,39 +47,45 @@ declare namespace RewardsExtension {
     status?: PublisherStatus
   }
 
-  export interface Grant {
-    altcurrency: string
-    probi: string
-    expiryTime: number
-    type: string
+  export type CaptchaStatus = 'start' | 'wrongPosition' | 'generalError' | 'finished' | null
+
+  export enum PromotionTypes {
+    UGP = 0,
+    ADS = 1
   }
 
-  export type GrantStatus = 'wrongPosition' | 'grantGone' | 'generalError' | 'grantAlreadyClaimed' | number | null
+  export enum PromotionStatus {
+    ACTIVE = 0,
+    ATTESTED = 1,
+    CLAIMED = 2,
+    SIGNED_TOKENS = 3,
+    FINISHED = 4,
+    OVER = 5
+  }
 
-  export interface GrantInfo {
-    promotionId?: string
-    altcurrency?: string
-    probi: string
-    expiryTime: number
-    captcha?: string
+  export interface Promotion {
+    promotionId: string
+    amount: number
+    expiresAt: number
+    status: PromotionStatus
+    type: PromotionTypes
+    captchaStatus: CaptchaStatus
+    captchaImage?: string
+    captchaId?: string
     hint?: string
-    status?: GrantStatus
-    type?: string
     finishTitle?: string
     finishText?: string
     finishTokenTitle?: string
   }
 
-  export interface GrantResponse {
-    promotionId?: string
-    status?: number
-    type?: string
+  export interface PromotionResponse {
+    result: number
+    promotions: Promotion[]
   }
 
-  export interface GrantFinish {
+  export interface PromotionFinish {
     result: Result,
-    statusCode: number,
-    expiryTime: number
+    promotion: Promotion
   }
 
   export const enum Result {
@@ -97,29 +102,26 @@ declare namespace RewardsExtension {
     REGISTRATION_VERIFICATION_FAILED = 10,
     BAD_REGISTRATION_RESPONSE = 11,
     WALLET_CREATED = 12,
-    GRANT_NOT_FOUND = 13,
     WALLET_CORRUPT = 17
   }
 
   export interface Captcha {
-    image: string
+    result: number
+    promotionId: string
+    captchaImage: string
     hint: string
   }
 
   export interface WalletProperties {
-    grants?: Grant[]
+    defaultMonthlyTipChoices: number[]
   }
 
-  export interface Report {
-    ads: string
-    closing: string
-    contribute: string
-    deposit: string
-    donation: string
-    grant: string
-    tips: string
-    opening: string
-    total: string
+  export interface BalanceReport {
+    ads: number
+    contribute: number
+    donation: number
+    grant: number
+    tips: number
   }
 
   export interface Notification {

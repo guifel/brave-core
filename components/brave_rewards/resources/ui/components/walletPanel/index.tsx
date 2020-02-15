@@ -66,6 +66,7 @@ export interface Props {
   moreLink?: string
   acEnabled?: boolean
   setMonthlyAction: () => void
+  onlyAnonWallet?: boolean
 }
 
 export default class WalletPanel extends React.PureComponent<Props, {}> {
@@ -83,6 +84,7 @@ export default class WalletPanel extends React.PureComponent<Props, {}> {
           showUnVerifiedHelpIcon={
             !this.props.isVerified && this.props.showUnVerified
           }
+          showUnVerified={this.props.showUnVerified}
           refreshingPublisher={this.props.refreshingPublisher}
           onRefreshPublisher={this.props.onRefreshPublisher}
           publisherRefreshed={this.props.publisherRefreshed}
@@ -92,8 +94,9 @@ export default class WalletPanel extends React.PureComponent<Props, {}> {
   }
 
   donationDropDown () {
-    const { donationAmounts } = this.props
+    const { donationAmounts, onlyAnonWallet } = this.props
     const monthlyAmount = this.props.monthlyAmount || '5.0'
+    const batFormatString = onlyAnonWallet ? 'bap' : 'bat'
 
     if (!donationAmounts) {
       return null
@@ -111,7 +114,7 @@ export default class WalletPanel extends React.PureComponent<Props, {}> {
                 key={`k-${token.tokens}`}
                 value={token.tokens}
               >
-                {token.tokens} {getLocale('bat')} ({token.converted} USD)
+                {token.tokens} {getLocale(batFormatString)} ({token.converted} USD)
               </option>
             )
           }).concat(
@@ -120,7 +123,7 @@ export default class WalletPanel extends React.PureComponent<Props, {}> {
                value={'show'}
                disabled={true}
              >
-               {monthlyAmount} {getLocale('bat')}
+               {monthlyAmount} {getLocale(batFormatString)}
              </StyledOptionShown>
           )}
         </StyledSelect>
@@ -130,10 +133,6 @@ export default class WalletPanel extends React.PureComponent<Props, {}> {
 
   donationControls () {
     const { donationAmounts, acEnabled, setMonthlyAction } = this.props
-
-    if (!donationAmounts && !acEnabled) {
-      return null
-    }
 
     const firstColSpan = donationAmounts ? '5' : '4'
     const secColSpan = donationAmounts ? '1' : '2'
@@ -158,7 +157,7 @@ export default class WalletPanel extends React.PureComponent<Props, {}> {
           </StyledGrid>
           : null
         }
-        <StyledGrid>
+        <StyledGrid id={'panel-donate-monthly'}>
           <StyledColumn size={firstColSpan}>
             <StyledDonateText>
               {getLocale('donateMonthly')}

@@ -53,21 +53,18 @@ import org.chromium.base.ContextUtils;
 import org.chromium.base.Log;
 import org.chromium.base.SysUtils;
 import org.chromium.base.task.AsyncTask;
-// TODO
-// import org.chromium.chrome.browser.BraveAdsNativeHelper;
+import org.chromium.chrome.browser.BraveAdsNativeHelper;
 import org.chromium.chrome.browser.BraveRewardsHelper;
 import org.chromium.chrome.browser.BraveRewardsObserver;
 import org.chromium.chrome.browser.BraveActivity;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
-// TODO
-// import org.chromium.chrome.browser.dialogs.BraveAdsSignupDialog;
+import org.chromium.chrome.browser.dialogs.BraveAdsSignupDialog;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabModelImpl;
 import org.chromium.chrome.browser.tabmodel.TabLaunchType;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorImpl;
-// TODO
-// import org.chromium.chrome.browser.util.PackageUtils;
+import org.chromium.chrome.browser.util.PackageUtils;
 import org.chromium.chrome.R;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.base.ContextUtils;
@@ -101,7 +98,7 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
     public static final String PREF_GRANTS_NOTIFICATION_RECEIVED = "grants_notification_received";
     public static final String PREF_IS_BRAVE_REWARDS_ENABLED = "brave_rewards_enabled";
     public static final String PREF_WAS_TOOLBAR_BAT_LOGO_BUTTON_PRESSED = "was_toolbar_bat_logo_button_pressed";
-    private static final String ADS_GRANT_TYPE = "ads";
+    private static final String ADS_GRANT_TYPE = "1";
 
     // Custom Android notification
     private static final int REWARDS_NOTIFICATION_NO_INTERNET = 1000;
@@ -116,13 +113,11 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
     private static final String ERROR_CONVERT_PROBI = "ERROR";
 
     // Balance report codes
-    private static final int BALANCE_REPORT_DEPOSITS = 0;
-    private static final int BALANCE_REPORT_GRANTS = 1;
-    private static final int BALANCE_REPORT_EARNING_FROM_ADS = 2;
-    private static final int BALANCE_REPORT_AUTO_CONTRIBUTE = 3;
-    private static final int BALANCE_REPORT_RECURRING_DONATION = 4;
-    private static final int BALANCE_REPORT_ONE_TIME_DONATION = 5;
-    private static final int BALANCE_REPORT_TOTAL = 6;
+    private static final int BALANCE_REPORT_GRANTS = 0;
+    private static final int BALANCE_REPORT_EARNING_FROM_ADS = 1;
+    private static final int BALANCE_REPORT_AUTO_CONTRIBUTE = 2;
+    private static final int BALANCE_REPORT_RECURRING_DONATION = 3;
+    private static final int BALANCE_REPORT_ONE_TIME_DONATION = 4;
 
     protected final View anchor;
     private final PopupWindow window;
@@ -248,6 +243,7 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
               @Override
               public void run() {
                   thisObject.mBraveRewardsNativeWorker.GetWalletProperties();
+                  mBraveRewardsNativeWorker.FetchGrants();
               }
           });
         }
@@ -934,7 +930,6 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
                 description = root.getResources().getString(R.string.brave_ui_insufficient_funds_desc);
                 break;
             case BraveRewardsNativeWorker.REWARDS_NOTIFICATION_BACKUP_WALLET:
-                Log.i("TAG", "!!!here3");
                 btClaimOk.setText(root.getResources().getString(R.string.ok));
                 notification_icon.setImageResource(R.drawable.notification_icon);
                 title = root.getResources().getString(R.string.brave_ui_backup_wallet_msg);
@@ -988,8 +983,7 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
     public void OnWalletInitialized(int error_code) {
         if (BraveRewardsNativeWorker.WALLET_CREATED == error_code) {
             walletInitialized = true;
-            // TODO
-            // BraveAdsNativeHelper.nativeSetAdsEnabled(Profile.getLastUsedProfile());
+            BraveAdsNativeHelper.nativeSetAdsEnabled(Profile.getLastUsedProfile());
             ShowWebSiteView(false);
         } else if (BraveRewardsNativeWorker.SAFETYNET_ATTESTATION_FAILED == error_code) {
             dismiss();
@@ -1027,47 +1021,6 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
           String usdText = String.format(this.root.getResources().getString(R.string.brave_ui_usd),
             String.format(Locale.getDefault(), "%.2f", usdValue));
           ((TextView)this.root.findViewById(R.id.br_usd_wallet)).setText(usdText);
-
-          int currentGrantsCount = mBraveRewardsNativeWorker.GetCurrentGrantsCount();
-          Button btGrants = (Button)this.root.findViewById(R.id.grants_dropdown);
-          if (currentGrantsCount != 0) {
-              btGrants.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.down_icon, 0);
-              btGrants.setVisibility(View.VISIBLE);
-
-              ListView listView = (ListView)this.root.findViewById(R.id.grants_listview);
-
-              ArrayAdapter<Spanned> adapter = new ArrayAdapter<Spanned>(
-                ContextUtils.getApplicationContext(), R.layout.brave_rewards_grants_list_item);
-              for (int i = 0; i < currentGrantsCount; i++) {
-                  String[] grant = mBraveRewardsNativeWorker.GetCurrentGrant(i);
-                  if (grant.length < 3) {
-                    continue;
-                  }
-
-                  double  probiDouble = BraveRewardsHelper.probiToDouble(grant[0]);
-                  String probiString = Double.isNaN(probiDouble) ? ERROR_CONVERT_PROBI : String.format(Locale.getDefault(), "%.1f", probiDouble);
-                  String toInsert = "<b><font color=#ffffff>" + probiString + " BAT</font></b> ";
-
-                  if (grant[2].equals(BraveRewardsPanelPopup.ADS_GRANT_TYPE) == false) {
-                      TimeZone utc = TimeZone.getTimeZone("UTC");
-                      Calendar calTime = Calendar.getInstance(utc);
-                      calTime.setTimeInMillis(Long.parseLong(grant[1]) * 1000);
-                      String date = Integer.toString(calTime.get(Calendar.MONTH) + 1) + "/" +
-                              Integer.toString(calTime.get(Calendar.DAY_OF_MONTH)) + "/" +
-                              Integer.toString(calTime.get(Calendar.YEAR));
-                      toInsert += String.format(this.root.getResources().getString(R.string.brave_ui_expires_on),
-                              date);
-                  }
-                  else {
-                      toInsert += this.root.getResources().getString(R.string.brave_ui_ads_earnings);
-                  }
-
-                  adapter.add(BraveRewardsHelper.spannedFromHtmlString(toInsert));
-              }
-              listView.setAdapter(adapter);
-          } else {
-            btGrants.setVisibility(View.GONE);
-          }
         }
         walletDetailsReceived = true;
       } else if (BraveRewardsNativeWorker.LEDGER_ERROR == error_code) {   // No Internet connection
@@ -1079,6 +1032,48 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
 
       if (former_walletDetailsReceived != walletDetailsReceived) {
           EnableWalletDetails(walletDetailsReceived);
+      }
+    }
+
+    @Override
+    public void OnFetchPromotions() {
+      int currentGrantsCount = mBraveRewardsNativeWorker.GetCurrentGrantsCount();
+      Button btGrants = (Button)this.root.findViewById(R.id.grants_dropdown);
+      if (currentGrantsCount != 0) {
+          btGrants.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.down_icon, 0);
+          btGrants.setVisibility(View.VISIBLE);
+
+          ListView listView = (ListView)this.root.findViewById(R.id.grants_listview);
+
+          ArrayAdapter<Spanned> adapter = new ArrayAdapter<Spanned>(
+            ContextUtils.getApplicationContext(), R.layout.brave_rewards_grants_list_item);
+          for (int i = 0; i < currentGrantsCount; i++) {
+              String[] grant = mBraveRewardsNativeWorker.GetCurrentGrant(i);
+              if (grant.length < 3) {
+                continue;
+              }
+
+              String toInsert = "<b><font color=#ffffff>" + grant[0] + " BAT</font></b> ";
+
+              if (grant[2].equals(BraveRewardsPanelPopup.ADS_GRANT_TYPE) == false) {
+                  TimeZone utc = TimeZone.getTimeZone("UTC");
+                  Calendar calTime = Calendar.getInstance(utc);
+                  calTime.setTimeInMillis(Long.parseLong(grant[1]) * 1000);
+                  String date = Integer.toString(calTime.get(Calendar.MONTH) + 1) + "/" +
+                          Integer.toString(calTime.get(Calendar.DAY_OF_MONTH)) + "/" +
+                          Integer.toString(calTime.get(Calendar.YEAR));
+                  toInsert += String.format(this.root.getResources().getString(R.string.brave_ui_expires_on),
+                          date);
+              }
+              else {
+                  toInsert += this.root.getResources().getString(R.string.brave_ui_ads_earnings);
+              }
+
+              adapter.add(BraveRewardsHelper.spannedFromHtmlString(toInsert));
+          }
+          listView.setAdapter(adapter);
+      } else {
+        btGrants.setVisibility(View.GONE);
       }
     }
 
@@ -1195,7 +1190,7 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
     }
 
     @Override
-    public void OnGetCurrentBalanceReport(String[] report) {
+    public void OnGetCurrentBalanceReport(double[] report) {
         boolean no_activity = true;
         for (int i = 0; i < report.length; i++) {
           TextView tvTitle = null;
@@ -1204,7 +1199,7 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
           String text = "";
           String textUSD = "";
 
-          double  probiDouble = BraveRewardsHelper.probiToDouble(report[i]);
+          double  probiDouble = report[i];
           boolean hideControls = (probiDouble == 0);
           String value = Double.isNaN(probiDouble) ? ERROR_CONVERT_PROBI : String.format(Locale.getDefault(), "%.1f", probiDouble);
 
@@ -1215,8 +1210,6 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
           }
 
           switch (i) {
-            case BALANCE_REPORT_DEPOSITS:
-              break;
             case BALANCE_REPORT_GRANTS:
               tvTitle = (TextView)root.findViewById(R.id.br_grants_claimed_title);
               tv = (TextView)root.findViewById(R.id.br_grants_claimed_bat);
@@ -1252,8 +1245,6 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
               text = "<font color=#392DD1>" + value + "</font><font color=#000000> BAT</font>";
               textUSD = usdValue;
               break;
-            case BALANCE_REPORT_TOTAL:
-              break;
           }
           if (tvTitle != null && tv != null && tvUSD != null &&
               !text.isEmpty() && !textUSD.isEmpty()) {
@@ -1264,7 +1255,7 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
             tv.setText(toInsert);
             tvUSD.setText(textUSD);
           }
-          if (!report[i].equals("0")) {
+          if (report[i] != 0) {
             no_activity = false;
           }
         }
@@ -1314,6 +1305,7 @@ public class BraveRewardsPanelPopup implements BraveRewardsObserver, BraveReward
     public void OnNotificationDeleted(String id) {
         DismissNotification(id);
         mBraveRewardsNativeWorker.GetWalletProperties();
+        mBraveRewardsNativeWorker.FetchGrants();
     }
 
     @Override

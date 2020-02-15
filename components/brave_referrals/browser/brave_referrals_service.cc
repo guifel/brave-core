@@ -93,6 +93,15 @@ std::string BuildReferralEndpoint(const std::string& path) {
 
 namespace brave {
 
+std::string GetAPIKey() {
+  std::string api_key = BRAVE_REFERRALS_API_KEY;
+  std::unique_ptr<base::Environment> env(base::Environment::Create());
+  if (env->HasVar("BRAVE_REFERRALS_API_KEY"))
+    env->GetVar("BRAVE_REFERRALS_API_KEY", &api_key);
+
+  return api_key;
+}
+
 BraveReferralsService::BraveReferralsService(PrefService* pref_service)
     : initialized_(false),
       task_runner_(base::CreateSequencedTaskRunner(
@@ -367,13 +376,13 @@ void BraveReferralsService::GetFirstRunTimeDesktop() {
 
 void BraveReferralsService::PerformFinalizationChecks() {
   // Delete the promo code preference, if appropriate.
-  base::PostTaskWithTraits(
+  base::PostTask(
       FROM_HERE, {content::BrowserThread::UI},
       base::BindOnce(&BraveReferralsService::MaybeDeletePromoCodePref,
                      base::Unretained(this)));
 
   // Check for referral finalization, if appropriate.
-  base::PostTaskWithTraits(
+  base::PostTask(
       FROM_HERE, {content::BrowserThread::UI},
       base::BindOnce(&BraveReferralsService::MaybeCheckForReferralFinalization,
                      base::Unretained(this)));
@@ -470,10 +479,7 @@ void BraveReferralsService::MaybeDeletePromoCodePref() const {
 }
 
 std::string BraveReferralsService::BuildReferralInitPayload() const {
-  std::string api_key = BRAVE_REFERRALS_API_KEY;
-  std::unique_ptr<base::Environment> env(base::Environment::Create());
-  if (env->HasVar("BRAVE_REFERRALS_API_KEY"))
-    env->GetVar("BRAVE_REFERRALS_API_KEY", &api_key);
+  std::string api_key = GetAPIKey();
 
   base::Value root(base::Value::Type::DICTIONARY);
   root.SetKey("api_key", base::Value(api_key));
@@ -488,10 +494,7 @@ std::string BraveReferralsService::BuildReferralInitPayload() const {
 
 std::string BraveReferralsService::BuildReferralFinalizationCheckPayload()
     const {
-  std::string api_key = BRAVE_REFERRALS_API_KEY;
-  std::unique_ptr<base::Environment> env(base::Environment::Create());
-  if (env->HasVar("BRAVE_REFERRALS_API_KEY"))
-    env->GetVar("BRAVE_REFERRALS_API_KEY", &api_key);
+  std::string api_key = GetAPIKey();
 
   base::Value root(base::Value::Type::DICTIONARY);
   root.SetKey("api_key", base::Value(api_key));

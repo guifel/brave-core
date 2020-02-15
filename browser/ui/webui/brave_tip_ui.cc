@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "base/memory/weak_ptr.h"
 #include "base/strings/utf_string_conversions.h"
@@ -62,6 +63,7 @@ class RewardsTipDOMHandler : public WebUIMessageHandler,
   void OnGetRecurringTips(
       std::unique_ptr<brave_rewards::ContentSiteList> list);
   void TweetTip(const base::ListValue *args);
+  void OnlyAnonWallet(const base::ListValue* args);
   void GetExternalWallet(const base::ListValue* args);
   void OnExternalWallet(
       const int32_t result,
@@ -89,6 +91,13 @@ class RewardsTipDOMHandler : public WebUIMessageHandler,
 
   void OnRecurringTipRemoved(brave_rewards::RewardsService* rewards_service,
                              bool success) override;
+
+  void OnReconcileComplete(
+      brave_rewards::RewardsService* rewards_service,
+      unsigned int result,
+      const std::string& viewing_id,
+      const double amount,
+      const int32_t type) override;
 
   brave_rewards::RewardsService* rewards_service_;  // NOT OWNED
   base::WeakPtrFactory<RewardsTipDOMHandler> weak_factory_;
@@ -145,6 +154,11 @@ void RewardsTipDOMHandler::RegisterMessages() {
       base::BindRepeating(
           &RewardsTipDOMHandler::GetExternalWallet,
           base::Unretained(this)));
+  web_ui()->RegisterMessageCallback(
+      "brave_rewards_tip.onlyAnonWallet",
+      base::BindRepeating(
+          &RewardsTipDOMHandler::OnlyAnonWallet,
+          base::Unretained(this)));
 }
 
 void RewardsTipDOMHandler::GetPublisherTipData(
@@ -164,6 +178,15 @@ void RewardsTipDOMHandler::GetWalletProperties(const base::ListValue* args) {
   rewards_service_->FetchWalletProperties();
 }
 
+static std::unique_ptr<base::ListValue> CreateListOfDoubles(
+    const std::vector<double>& items) {
+  auto result = std::make_unique<base::ListValue>();
+  for (double const& item : items) {
+    result->AppendDouble(item);
+  }
+  return result;
+}
+
 void RewardsTipDOMHandler::OnWalletProperties(
     brave_rewards::RewardsService* rewards_service,
     int error_code,
@@ -178,21 +201,12 @@ void RewardsTipDOMHandler::OnWalletProperties(
   auto walletInfo = std::make_unique<base::DictionaryValue>();
 
   if (error_code == 0 && wallet_properties) {
-    auto choices = std::make_unique<base::ListValue>();
-    for (double const& choice : wallet_properties->parameters_choices) {
-      choices->AppendDouble(choice);
-    }
-    walletInfo->SetList("choices", std::move(choices));
-
-    auto grants = std::make_unique<base::ListValue>();
-    for (auto const& item : wallet_properties->grants) {
-      auto grant = std::make_unique<base::DictionaryValue>();
-      grant->SetString("probi", item.probi);
-      grant->SetInteger("expiryTime", item.expiryTime);
-      grant->SetString("type", item.type);
-      grants->Append(std::move(grant));
-    }
-    walletInfo->SetList("grants", std::move(grants));
+    walletInfo->SetList("choices",
+        CreateListOfDoubles(wallet_properties->parameters_choices));
+    walletInfo->SetList("defaultTipChoices",
+        CreateListOfDoubles(wallet_properties->default_tip_choices));
+    walletInfo->SetList("defaultMonthlyTipChoices",
+        CreateListOfDoubles(wallet_properties->default_monthly_tip_choices));
   }
 
   result.SetDictionary("wallet", std::move(walletInfo));
@@ -209,7 +223,7 @@ void RewardsTipDOMHandler::OnTip(const base::ListValue* args) {
   CHECK_EQ(3U, args->GetSize());
 
   const std::string publisher_key = args->GetList()[0].GetString();
-  const int amount = args->GetList()[1].GetInt();
+  const double amount = args->GetList()[1].GetDouble();
   const bool recurring = args->GetList()[2].GetBool();
 
   if (publisher_key.empty() || amount < 1) {
@@ -468,4 +482,35 @@ void RewardsTipDOMHandler::OnExternalWallet(
 
   web_ui()->CallJavascriptFunctionUnsafe(
       "brave_rewards_tip.externalWallet", data);
+}
+
+void RewardsTipDOMHandler::OnlyAnonWallet(const base::ListValue* args) {
+  if (!rewards_service_ || !web_ui()->CanCallJavascript()) {
+    return;
+  }
+
+  const bool allow = rewards_service_->OnlyAnonWallet();
+
+  web_ui()->CallJavascriptFunctionUnsafe(
+      "brave_rewards_tip.onlyAnonWallet",
+      base::Value(allow));
+}
+
+void RewardsTipDOMHandler::OnReconcileComplete(
+    brave_rewards::RewardsService* rewards_service,
+    unsigned int result,
+    const std::string& viewing_id,
+    const double amount,
+    const int32_t type) {
+  if (!web_ui()->CanCallJavascript()) {
+     return;
+  }
+
+  base::DictionaryValue complete;
+  complete.SetKey("result", base::Value(static_cast<int>(result)));
+  complete.SetKey("type", base::Value(type));
+
+  web_ui()->CallJavascriptFunctionUnsafe(
+      "brave_rewards_tip.reconcileComplete",
+      complete);
 }

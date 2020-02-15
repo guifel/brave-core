@@ -14,8 +14,13 @@
 #include "brave/browser/brave_stats_updater.h"
 #include "brave/browser/component_updater/brave_component_updater_configurator.h"
 #include "brave/browser/component_updater/brave_component_updater_delegate.h"
+#include "brave/browser/net/brave_system_request_handler.h"
 #include "brave/browser/profiles/brave_profile_manager.h"
+#include "brave/browser/themes/brave_dark_mode_utils.h"
 #include "brave/browser/tor/buildflags.h"
+#include "brave/browser/ui/brave_browser_command_controller.h"
+#include "brave/common/pref_names.h"
+#include "brave/components/brave_component_updater/browser/brave_on_demand_updater.h"
 #include "brave/components/brave_component_updater/browser/local_data_files_service.h"
 #include "brave/components/brave_shields/browser/ad_block_custom_filters_service.h"
 #include "brave/components/brave_shields/browser/ad_block_regional_service_manager.h"
@@ -24,14 +29,19 @@
 #include "brave/components/brave_shields/browser/https_everywhere_service.h"
 #include "brave/components/brave_shields/browser/referrer_whitelist_service.h"
 #include "brave/components/brave_shields/browser/tracking_protection_service.h"
+#include "brave/components/ntp_sponsored_images/browser/ntp_sponsored_images_service.h"
 #include "brave/components/p3a/buildflags.h"
 #include "brave/components/p3a/brave_histogram_rewrite.h"
 #include "brave/components/p3a/brave_p3a_service.h"
+#include "brave/services/network/public/cpp/system_request_handler.h"
+#include "chrome/browser/ui/browser_list.h"
+#include "chrome/browser/ui/webui/components_ui.h"
 #include "chrome/common/buildflags.h"
 #include "chrome/common/chrome_paths.h"
 #include "components/component_updater/component_updater_service.h"
 #include "components/component_updater/timer_update_scheduler.h"
 #include "content/public/browser/browser_thread.h"
+#include "services/network/public/cpp/resource_request.h"
 
 #if BUILDFLAG(ENABLE_NATIVE_NOTIFICATIONS)
 #include "chrome/browser/notifications/notification_platform_bridge.h"
@@ -57,12 +67,29 @@
 
 #if BUILDFLAG(ENABLE_TOR)
 #include "brave/browser/extensions/brave_tor_client_updater.h"
+#include "brave/common/tor/pref_names.h"
 #endif
 
 #if defined(OS_ANDROID)
 #include "chrome/browser/android/chrome_feature_list.h"
 #include "chrome/browser/android/component_updater/background_task_update_scheduler.h"
+#else
+#include "chrome/browser/ui/browser.h"
 #endif
+
+using ntp_sponsored_images::NTPSponsoredImagesService;
+
+namespace {
+
+// Initializes callback for SystemRequestHandler
+void InitSystemRequestHandlerCallback() {
+  network::SystemRequestHandler::OnBeforeSystemRequestCallback
+      before_system_request_callback = base::Bind(brave::OnBeforeSystemRequest);
+  network::SystemRequestHandler::GetInstance()
+      ->RegisterOnBeforeSystemRequestCallback(before_system_request_callback);
+}
+
+}  // namespace
 
 BraveBrowserProcessImpl* g_brave_browser_process = nullptr;
 
@@ -100,6 +127,28 @@ BraveBrowserProcessImpl::BraveBrowserProcessImpl(StartupData* startup_data)
   brave_p3a_service();
   brave::SetupHistogramsBraveization();
 #endif  // BUILDFLAG(BRAVE_P3A_ENABLED)
+}
+
+void BraveBrowserProcessImpl::Init() {
+  BrowserProcessImpl::Init();
+
+  brave_component_updater::BraveOnDemandUpdater::GetInstance()->
+      RegisterOnDemandUpdateCallback(
+          base::BindRepeating(&ComponentsUI::OnDemandUpdate));
+  UpdateBraveDarkMode();
+  pref_change_registrar_.Add(
+      kBraveDarkMode,
+      base::Bind(&BraveBrowserProcessImpl::OnBraveDarkModeChanged,
+                 base::Unretained(this)));
+
+#if BUILDFLAG(ENABLE_TOR)
+  pref_change_registrar_.Add(
+      tor::prefs::kTorDisabled,
+      base::Bind(&BraveBrowserProcessImpl::OnTorEnabledChanged,
+                 base::Unretained(this)));
+#endif
+
+  InitSystemRequestHandlerCallback();
 }
 
 brave_component_updater::BraveComponent::Delegate*
@@ -164,6 +213,17 @@ BraveBrowserProcessImpl::ad_block_regional_service_manager() {
         brave_shields::AdBlockRegionalServiceManagerFactory(
             brave_component_updater_delegate());
   return ad_block_regional_service_manager_.get();
+}
+
+NTPSponsoredImagesService*
+BraveBrowserProcessImpl::ntp_sponsored_images_service() {
+  if (!ntp_sponsored_images_service_) {
+    ntp_sponsored_images_service_ =
+        std::make_unique<NTPSponsoredImagesService>(
+            component_updater());
+  }
+
+  return ntp_sponsored_images_service_.get();
 }
 
 brave_shields::AutoplayWhitelistService*
@@ -236,6 +296,16 @@ BraveBrowserProcessImpl::local_data_files_service() {
   return local_data_files_service_.get();
 }
 
+void BraveBrowserProcessImpl::UpdateBraveDarkMode() {
+  // Update with proper system theme to make brave theme and base ui components
+  // theme use same theme.
+  dark_mode::SetSystemDarkMode(dark_mode::GetBraveDarkModeType());
+}
+
+void BraveBrowserProcessImpl::OnBraveDarkModeChanged() {
+  UpdateBraveDarkMode();
+}
+
 #if BUILDFLAG(ENABLE_TOR)
 extensions::BraveTorClientUpdater*
 BraveBrowserProcessImpl::tor_client_updater() {
@@ -245,6 +315,14 @@ BraveBrowserProcessImpl::tor_client_updater() {
   tor_client_updater_ = extensions::BraveTorClientUpdaterFactory(
       brave_component_updater_delegate());
   return tor_client_updater_.get();
+}
+
+void BraveBrowserProcessImpl::OnTorEnabledChanged() {
+  // Update all browsers' tor command status.
+  for (Browser* browser : *BrowserList::GetInstance()) {
+    static_cast<chrome::BraveBrowserCommandController*>(
+        browser->command_controller())->UpdateCommandForTor();
+  }
 }
 #endif
 

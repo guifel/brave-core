@@ -6,19 +6,19 @@
 #include <algorithm>
 #include <cmath>
 #include <ctime>
+#include <map>
 #include <utility>
 #include <vector>
 
 #include "base/strings/stringprintf.h"
 #include "bat/ledger/global_constants.h"
-#include "bat/ledger/internal/bat_helper.h"
-#include "bat/ledger/internal/bignum.h"
 #include "bat/ledger/internal/ledger_impl.h"
+#include "bat/ledger/internal/properties/publisher_settings_properties.h"
+#include "bat/ledger/internal/properties/report_balance_properties.h"
 #include "bat/ledger/internal/publisher/publisher.h"
 #include "bat/ledger/internal/publisher/publisher_server_list.h"
-#include "bat/ledger/internal/rapidjson_bat_helper.h"
+#include "bat/ledger/internal/state/publisher_settings_state.h"
 #include "bat/ledger/internal/static_values.h"
-#include "mojo/public/cpp/bindings/map.h"
 
 /* foo.bar.example.com
    QLD = 'bar'
@@ -40,9 +40,9 @@ namespace braveledger_publisher {
 
 Publisher::Publisher(bat_ledger::LedgerImpl* ledger):
   ledger_(ledger),
-  state_(new braveledger_bat_helper::PUBLISHER_STATE_ST),
+  state_(new ledger::PublisherSettingsProperties),
   server_list_(std::make_unique<PublisherServerList>(ledger)) {
-  calcScoreConsts(state_->min_publisher_duration_);
+  calcScoreConsts(state_->min_page_time_before_logging_a_visit);
 }
 
 Publisher::~Publisher() {
@@ -443,44 +443,44 @@ void Publisher::OnRestorePublishers(
 
 // In seconds
 void Publisher::setPublisherMinVisitTime(const uint64_t& duration) {
-  state_->min_publisher_duration_ = duration;
+  state_->min_page_time_before_logging_a_visit = duration;
   calcScoreConsts(duration);
   SynopsisNormalizer();
   saveState();
 }
 
 void Publisher::setPublisherMinVisits(const unsigned int visits) {
-  state_->min_visits_ = visits;
+  state_->min_visits_for_publisher_relevancy = visits;
   SynopsisNormalizer();
   saveState();
 }
 
 void Publisher::setPublisherAllowNonVerified(const bool& allow) {
-  state_->allow_non_verified_ = allow;
+  state_->allow_non_verified_sites_in_list = allow;
   SynopsisNormalizer();
   saveState();
 }
 
 void Publisher::setPublisherAllowVideos(const bool& allow) {
-  state_->allow_videos_ = allow;
+  state_->allow_contribution_to_videos = allow;
   SynopsisNormalizer();
   saveState();
 }
 
 uint64_t Publisher::getPublisherMinVisitTime() const {
-  return state_->min_publisher_duration_;
+  return state_->min_page_time_before_logging_a_visit;
 }
 
 unsigned int Publisher::GetPublisherMinVisits() const {
-  return state_->min_visits_;
+  return state_->min_visits_for_publisher_relevancy;
 }
 
 bool Publisher::getPublisherAllowNonVerified() const {
-  return state_->allow_non_verified_;
+  return state_->allow_non_verified_sites_in_list;
 }
 
 bool Publisher::getPublisherAllowVideos() const {
-  return state_->allow_videos_;
+  return state_->allow_contribution_to_videos;
 }
 
 bool Publisher::GetMigrateScore() const {
@@ -626,102 +626,84 @@ bool Publisher::IsExcluded(
 }
 
 void Publisher::clearAllBalanceReports() {
-  if (state_->monthly_balances_.empty()) {
+  if (state_->monthly_balances.empty()) {
     return;
   }
-  state_->monthly_balances_.clear();
+  state_->monthly_balances.clear();
   saveState();
 }
 
 void Publisher::setBalanceReport(ledger::ActivityMonth month,
                                 int year,
                                 const ledger::BalanceReportInfo& report_info) {
-  braveledger_bat_helper::REPORT_BALANCE_ST report_balance;
-  report_balance.opening_balance_ = report_info.opening_balance;
-  report_balance.closing_balance_ = report_info.closing_balance;
-  report_balance.grants_ = report_info.grants;
-  report_balance.deposits_ = report_info.deposits;
-  report_balance.earning_from_ads_ = report_info.earning_from_ads;
-  report_balance.recurring_donation_ = report_info.recurring_donation;
-  report_balance.one_time_donation_ = report_info.one_time_donation;
-  report_balance.auto_contribute_ = report_info.auto_contribute;
+  ledger::ReportBalanceProperties report_balance;
+  report_balance.grants = report_info.grants;
+  report_balance.ad_earnings = report_info.earning_from_ads;
+  report_balance.recurring_donations = report_info.recurring_donation;
+  report_balance.one_time_donations = report_info.one_time_donation;
+  report_balance.auto_contributions = report_info.auto_contribute;
 
-  std::string total = "0";
-  total = braveledger_bat_bignum::sum(total, report_balance.grants_);
-  total = braveledger_bat_bignum::sum(total, report_balance.earning_from_ads_);
-  total = braveledger_bat_bignum::sum(total, report_balance.deposits_);
-  total = braveledger_bat_bignum::sub(total, report_balance.auto_contribute_);
-  total = braveledger_bat_bignum::sub(total,
-                                      report_balance.recurring_donation_);
-  total = braveledger_bat_bignum::sub(total, report_balance.one_time_donation_);
-
-  report_balance.total_ = total;
-  state_->monthly_balances_[GetBalanceReportName(month, year)] = report_balance;
+  state_->monthly_balances[GetBalanceReportName(month, year)] = report_balance;
   saveState();
 }
 
 void Publisher::GetBalanceReport(
-    ledger::ActivityMonth month,
-    int year,
+    const ledger::ActivityMonth month,
+    const int year,
     ledger::GetBalanceReportCallback callback) {
   ledger::BalanceReportInfo info;
-  bool result = GetBalanceReportInternal(month, year, &info);
+  const auto result = GetBalanceReportInternal(month, year, &info);
   callback(result, info.Clone());
 }
 
-bool Publisher::GetBalanceReportInternal(ledger::ActivityMonth month,
-                                     int year,
-                                     ledger::BalanceReportInfo* report_info) {
-  std::string name = GetBalanceReportName(month, year);
-  auto iter = state_->monthly_balances_.find(name);
+ledger::Result Publisher::GetBalanceReportInternal(
+    const ledger::ActivityMonth month,
+    const int year,
+    ledger::BalanceReportInfo* report_info) {
   if (!report_info) {
-    return false;
+    return ledger::Result::LEDGER_ERROR;
   }
 
-  if (iter == state_->monthly_balances_.end()) {
+  const std::string name = GetBalanceReportName(month, year);
+  auto iter = state_->monthly_balances.find(name);
+
+  if (iter == state_->monthly_balances.end()) {
     ledger::BalanceReportInfo new_report_info;
-    new_report_info.opening_balance = "0";
-    new_report_info.closing_balance = "0";
-    new_report_info.grants = "0";
-    new_report_info.earning_from_ads = "0";
-    new_report_info.auto_contribute = "0";
-    new_report_info.recurring_donation = "0";
-    new_report_info.one_time_donation = "0";
-    new_report_info.total = "0";
+    new_report_info.grants = 0.0;
+    new_report_info.earning_from_ads = 0.0;
+    new_report_info.auto_contribute = 0.0;
+    new_report_info.recurring_donation = 0.0;
+    new_report_info.one_time_donation = 0.0;
 
     setBalanceReport(month, year, new_report_info);
-    bool successGet = GetBalanceReportInternal(month, year, report_info);
-    if (successGet) {
-      iter = state_->monthly_balances_.find(name);
+    ledger::Result result = GetBalanceReportInternal(month, year, report_info);
+    if (result == ledger::Result::LEDGER_OK) {
+      iter = state_->monthly_balances.find(name);
     } else {
-      return false;
+      return ledger::Result::LEDGER_ERROR;
     }
   }
 
-  report_info->opening_balance = iter->second.opening_balance_;
-  report_info->closing_balance = iter->second.closing_balance_;
-  report_info->grants = iter->second.grants_;
-  report_info->earning_from_ads = iter->second.earning_from_ads_;
-  report_info->auto_contribute = iter->second.auto_contribute_;
-  report_info->recurring_donation = iter->second.recurring_donation_;
-  report_info->one_time_donation = iter->second.one_time_donation_;
+  report_info->grants = iter->second.grants;
+  report_info->earning_from_ads = iter->second.ad_earnings;
+  report_info->auto_contribute = iter->second.auto_contributions;
+  report_info->recurring_donation = iter->second.recurring_donations;
+  report_info->one_time_donation = iter->second.one_time_donations;
 
-  return true;
+  return ledger::Result::LEDGER_OK;
 }
 
 std::map<std::string, ledger::BalanceReportInfoPtr>
 Publisher::GetAllBalanceReports() {
   std::map<std::string, ledger::BalanceReportInfoPtr> newReports;
-  for (auto const& report : state_->monthly_balances_) {
+  for (auto const& report : state_->monthly_balances) {
     ledger::BalanceReportInfoPtr newReport = ledger::BalanceReportInfo::New();
-    const braveledger_bat_helper::REPORT_BALANCE_ST oldReport = report.second;
-    newReport->opening_balance = oldReport.opening_balance_;
-    newReport->closing_balance = oldReport.closing_balance_;
-    newReport->grants = oldReport.grants_;
-    newReport->earning_from_ads = oldReport.earning_from_ads_;
-    newReport->auto_contribute = oldReport.auto_contribute_;
-    newReport->recurring_donation = oldReport.recurring_donation_;
-    newReport->one_time_donation = oldReport.one_time_donation_;
+    const ledger::ReportBalanceProperties oldReport = report.second;
+    newReport->grants = oldReport.grants;
+    newReport->earning_from_ads = oldReport.ad_earnings;
+    newReport->auto_contribute = oldReport.auto_contributions;
+    newReport->recurring_donation = oldReport.recurring_donations;
+    newReport->one_time_donation = oldReport.one_time_donations;
 
     newReports[report.first] = std::move(newReport);
   }
@@ -730,18 +712,19 @@ Publisher::GetAllBalanceReports() {
 }
 
 void Publisher::saveState() {
-  std::string data;
-  braveledger_bat_helper::saveToJsonString(*state_, &data);
+  const ledger::PublisherSettingsState publisher_settings_state;
+  const std::string data = publisher_settings_state.ToJson(*state_);
   ledger_->SavePublisherState(data, this);
 }
 
 bool Publisher::loadState(const std::string& data) {
-  braveledger_bat_helper::PUBLISHER_STATE_ST state;
-  if (!braveledger_bat_helper::loadFromJson(&state, data.c_str()))
+  ledger::PublisherSettingsProperties state;
+  const ledger::PublisherSettingsState publisher_settings_state;
+  if (!publisher_settings_state.FromJson(data.c_str(), &state))
     return false;
 
-  state_.reset(new braveledger_bat_helper::PUBLISHER_STATE_ST(state));
-  calcScoreConsts(state_->min_publisher_duration_);
+  state_.reset(new ledger::PublisherSettingsProperties(state));
+  calcScoreConsts(state_->min_page_time_before_logging_a_visit);
   return true;
 }
 
@@ -847,33 +830,29 @@ void Publisher::OnPanelPublisherInfo(
   }
 }
 
-void Publisher::setBalanceReportItem(ledger::ActivityMonth month,
-                                         int year,
-                                         ledger::ReportType type,
-                                         const std::string& probi) {
+void Publisher::SetBalanceReportItem(
+    const ledger::ActivityMonth month,
+    const int year,
+    const ledger::ReportType type,
+    const double amount) {
   ledger::BalanceReportInfo report_info;
   GetBalanceReportInternal(month, year, &report_info);
 
   switch (type) {
-    case ledger::ReportType::GRANT:
-      report_info.grants =
-          braveledger_bat_bignum::sum(report_info.grants, probi);
+    case ledger::ReportType::GRANT_UGP:
+      report_info.grants = report_info.grants + amount;
       break;
-    case ledger::ReportType::ADS:
-      report_info.earning_from_ads =
-          braveledger_bat_bignum::sum(report_info.earning_from_ads, probi);
+    case ledger::ReportType::GRANT_AD:
+      report_info.earning_from_ads = report_info.earning_from_ads + amount;
       break;
     case ledger::ReportType::AUTO_CONTRIBUTION:
-      report_info.auto_contribute =
-          braveledger_bat_bignum::sum(report_info.auto_contribute, probi);
+      report_info.auto_contribute = report_info.auto_contribute + amount;
       break;
     case ledger::ReportType::TIP:
-      report_info.one_time_donation =
-          braveledger_bat_bignum::sum(report_info.one_time_donation, probi);
+      report_info.one_time_donation = report_info.one_time_donation + amount;
       break;
     case ledger::ReportType::TIP_RECURRING:
-      report_info.recurring_donation =
-          braveledger_bat_bignum::sum(report_info.recurring_donation, probi);
+      report_info.recurring_donation = report_info.recurring_donation + amount;
       break;
     default:
       break;

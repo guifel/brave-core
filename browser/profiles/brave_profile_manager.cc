@@ -23,9 +23,11 @@
 #include "brave/components/brave_shields/browser/ad_block_regional_service.h"
 #include "brave/components/brave_shields/browser/ad_block_service.h"
 #include "brave/components/brave_shields/browser/brave_shields_util.h"
+#include "brave/components/brave_wallet/browser/buildflags/buildflags.h"
 #include "brave/components/brave_webtorrent/browser/buildflags/buildflags.h"
 #include "brave/content/browser/webui/brave_shared_resources_data_source.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/profiles/profile_attributes_entry.h"
 #include "chrome/browser/profiles/profile_attributes_storage.h"
 #include "chrome/browser/profiles/profiles_state.h"
@@ -39,14 +41,20 @@
 #include "components/signin/public/base/signin_pref_names.h"
 #include "components/translate/core/browser/translate_pref_names.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/notification_service.h"
+#include "content/public/browser/notification_source.h"
 #include "content/public/browser/url_data_source.h"
-#include "content/public/common/webrtc_ip_handling_policy.h"
 #include "extensions/buildflags/buildflags.h"
+#include "third_party/blink/public/common/peerconnection/webrtc_ip_handling_policy.h"
 #include "ui/base/l10n/l10n_util.h"
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "chrome/browser/extensions/extension_service.h"
 #include "extensions/browser/extension_system.h"
+#endif
+
+#if BUILDFLAG(BRAVE_WALLET_ENABLED)
+#include "brave/browser/brave_wallet/brave_wallet_service_factory.h"
 #endif
 
 using content::BrowserThread;
@@ -58,6 +66,9 @@ using content::BrowserThread;
 BraveProfileManager::BraveProfileManager(const base::FilePath& user_data_dir)
     : ProfileManager(user_data_dir) {
   MigrateProfileNames();
+
+  registrar_.Add(this, chrome::NOTIFICATION_PROFILE_CREATED,
+                 content::NotificationService::AllSources());
 }
 
 BraveProfileManager::~BraveProfileManager() {
@@ -94,7 +105,7 @@ void BraveProfileManager::InitTorProfileUserPrefs(Profile* profile) {
     ->SetString(prefs::kProfileName,
                 l10n_util::GetStringUTF8(IDS_PROFILES_TOR_PROFILE_NAME));
   pref_service->SetString(prefs::kWebRTCIPHandlingPolicy,
-                          content::kWebRTCIPHandlingDisableNonProxiedUdp);
+                          blink::kWebRTCIPHandlingDisableNonProxiedUdp);
   pref_service->SetBoolean(prefs::kSafeBrowsingEnabled, false);
   // https://blog.torproject.org/bittorrent-over-tor-isnt-good-idea
 #if BUILDFLAG(ENABLE_BRAVE_WEBTORRENT)
@@ -132,11 +143,12 @@ void BraveProfileManager::DoFinalInitForServices(Profile* profile,
   ProfileManager::DoFinalInitForServices(profile, go_off_the_record);
   brave_ads::AdsServiceFactory::GetForProfile(profile);
   brave_rewards::RewardsServiceFactory::GetForProfile(profile);
+#if BUILDFLAG(BRAVE_WALLET_ENABLED)
+  BraveWalletServiceFactory::GetForProfile(profile);
+#endif
 #if !BUILDFLAG(USE_GCM_FROM_PLATFORM)
   gcm::BraveGCMChannelStatus::GetForProfile(profile);
 #endif
-  content::URLDataSource::Add(profile,
-      std::make_unique<brave_content::BraveSharedResourcesDataSource>());
 }
 
 void BraveProfileManager::OnProfileCreated(Profile* profile,
@@ -194,12 +206,33 @@ void BraveProfileManager::MigrateProfileNames() {
       storage.GetAllProfilesAttributesSortedByName();
   // Make sure we keep the numbering the same.
   for (auto* entry : entries) {
-    // Rename the necessary profiles.
+    // Rename the necessary profiles. Don't check for legacy names as profile
+    // info cache should have migrated them by now.
     if (entry->IsUsingDefaultName() &&
-        !storage.IsDefaultProfileName(entry->GetName())) {
+        !storage.IsDefaultProfileName(
+            entry->GetName(),
+            /*include_check_for_legacy_profile_name=*/false)) {
       auto icon_index = entry->GetAvatarIconIndex();
-      entry->SetName(storage.ChooseNameForNewProfile(icon_index));
+      entry->SetLocalProfileName(storage.ChooseNameForNewProfile(icon_index));
     }
   }
 #endif
+}
+
+void BraveProfileManager::Observe(int type,
+                                  const content::NotificationSource& source,
+                                  const content::NotificationDetails& details) {
+  switch (type) {
+    case chrome::NOTIFICATION_PROFILE_CREATED: {
+      Profile* profile = content::Source<Profile>(source).ptr();
+      content::URLDataSource::Add(
+          profile,
+          std::make_unique<brave_content::BraveSharedResourcesDataSource>());
+      break;
+    }
+    default: {
+      ProfileManager::Observe(type, source, details);
+      break;
+    }
+  }
 }

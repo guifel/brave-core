@@ -16,6 +16,7 @@
 #include "base/files/file_path.h"
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
+#include "base/values.h"
 #include "brave/components/brave_shields/browser/base_brave_shields_service.h"
 #include "brave/components/brave_component_updater/browser/dat_file_util.h"
 #include "content/public/common/resource_type.h"
@@ -41,9 +42,17 @@ class AdBlockBaseService : public BaseBraveShieldsService {
 
   bool ShouldStartRequest(const GURL &url, content::ResourceType resource_type,
     const std::string& tab_host, bool* did_match_exception,
-    bool* cancel_request_explicitly) override;
+    bool* cancel_request_explicitly, std::string* mock_data_url) override;
+  void AddResources(const std::string& resources);
   void EnableTag(const std::string& tag, bool enabled);
   bool TagExists(const std::string& tag);
+
+  base::Optional<base::Value> HostnameCosmeticResources(
+          const std::string& hostname);
+  std::string HiddenClassIdSelectors(
+          const std::vector<std::string>& classes,
+          const std::vector<std::string>& ids,
+          const std::vector<std::string>& exceptions);
 
  protected:
   friend class ::AdBlockServiceTest;
@@ -52,7 +61,8 @@ class AdBlockBaseService : public BaseBraveShieldsService {
 
   void GetDATFileData(const base::FilePath& dat_file_path);
   void AddKnownTagsToAdBlockInstance();
-  void ResetForTest(const std::string& rules);
+  void AddKnownResourcesToAdBlockInstance();
+  void ResetForTest(const std::string& rules, const std::string& resources);
 
   std::unique_ptr<adblock::Engine> ad_block_client_;
 
@@ -65,6 +75,7 @@ class AdBlockBaseService : public BaseBraveShieldsService {
 
   brave_component_updater::DATFileDataBuffer buffer_;
   std::vector<std::string> tags_;
+  std::string resources_;
   base::WeakPtrFactory<AdBlockBaseService> weak_factory_;
   DISALLOW_COPY_AND_ASSIGN(AdBlockBaseService);
 };

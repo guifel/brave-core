@@ -14,7 +14,7 @@
 #include <memory>
 
 #include "bat/ads/ads.h"
-#include "bat/ads/ad_history_detail.h"
+#include "bat/ads/ads_history.h"
 #include "bat/ads/ad_info.h"
 #include "bat/ads/notification_event_type.h"
 #include "bat/ads/notification_info.h"
@@ -22,6 +22,7 @@
 #include "bat/ads/internal/ads_serve.h"
 #include "bat/ads/internal/bundle.h"
 #include "bat/ads/internal/client.h"
+#include "bat/ads/internal/ad_conversion_tracking.h"
 #include "bat/ads/internal/event_type_blur_info.h"
 #include "bat/ads/internal/event_type_destroy_info.h"
 #include "bat/ads/internal/event_type_focus_info.h"
@@ -37,6 +38,7 @@ class Client;
 class Bundle;
 class AdsServe;
 class Notifications;
+class AdConversionTracking;
 class FrequencyCapping;
 class ExclusionRule;
 class PermissionRule;
@@ -56,6 +58,8 @@ class AdsImpl : public Ads {
   void InitializeStep3(
       const Result result);
   void InitializeStep4(
+      const Result result);
+  void InitializeStep5(
       const Result result);
   bool IsInitialized();
 
@@ -127,7 +131,12 @@ class AdsImpl : public Ads {
   void SetConfirmationsIsReady(
       const bool is_ready) override;
 
-  std::map<uint64_t, std::vector<AdsHistory>> GetAdsHistory() override;
+  AdsHistory GetAdsHistory(
+      const AdsHistory::FilterType filter_type,
+      const AdsHistory::SortType sort_type,
+      const uint64_t from_timestamp,
+      const uint64_t to_timestamp) override;
+
   AdContent::LikeAction ToggleAdThumbUp(
       const std::string& id,
       const std::string& creative_set_id,
@@ -166,7 +175,7 @@ class AdsImpl : public Ads {
       const std::string& url,
       const std::string& html);
 
-  std::string GetWinnerOverTimeCategory();
+  std::vector<std::string> GetWinningCategories();
   std::string GetWinningCategory(
       const std::vector<double>& page_score);
 
@@ -188,24 +197,29 @@ class AdsImpl : public Ads {
   void CheckEasterEgg(
       const std::string& url);
 
+  void CheckAdConversion(
+      const std::string& url);
+
   void CheckReadyAdServe(
       const bool forced);
-  void ServeAdFromCategory(
-      const std::string& category);
-  void OnServeAdFromCategory(
+  void ServeAdFromCategories(
+      const std::vector<std::string>& categories);
+  void OnServeAdFromCategories(
       const Result result,
-      const std::string& category,
+      const std::vector<std::string>& categories,
       const std::vector<AdInfo>& ads);
-  bool ServeAdFromParentCategory(
-      const std::string& category,
-      const std::vector<AdInfo>& ads);
+  bool ServeAdFromParentCategories(
+      const std::vector<std::string>& categories);
   void ServeUntargetedAd();
   void OnServeUntargetedAd(
       const Result result,
-      const std::string& category,
+      const std::vector<std::string>& categories,
       const std::vector<AdInfo>& ads);
+  void OnGetAdConversions(
+      const Result result,
+      const std::string& url,
+      const std::vector<AdConversionTrackingInfo>& ad_conversions);
   void ServeAd(
-      const std::string& category,
       const std::vector<AdInfo>& ads);
 
   void SuccessfullyServedAd();
@@ -218,13 +232,15 @@ class AdsImpl : public Ads {
       const std::vector<AdInfo>& ads) const;
   std::vector<AdInfo> GetUnseenAds(
       const std::vector<AdInfo>& ads) const;
+  std::vector<AdInfo> GetAdsForUnseenAdvertisers(
+      const std::vector<AdInfo>& ads) const;
 
   bool IsAdValid(
       const AdInfo& ad_info);
   NotificationInfo last_shown_notification_info_;
+  AdInfo last_shown_ad_info_;
   bool ShowAd(
-      const AdInfo& ad_info,
-      const std::string& category);
+      const AdInfo& ad_info);
   bool IsAllowedToServeAds();
 
   uint32_t collect_activity_timer_id_;
@@ -253,7 +269,7 @@ class AdsImpl : public Ads {
   void BundleUpdated();
 
   uint32_t sustained_ad_interaction_timer_id_;
-  std::string last_sustaining_ad_url_;
+  std::string last_sustained_ad_domain_;
   void StartSustainingAdInteraction(
       const uint64_t start_timer_in);
   void SustainAdInteractionIfNeeded();
@@ -310,15 +326,18 @@ class AdsImpl : public Ads {
 
   bool IsSupportedUrl(
       const std::string& url) const;
-  bool UrlHostsMatch(
+  bool DomainsMatch(
       const std::string& url_1,
       const std::string& url_2) const;
+  std::string GetDomain(
+      const std::string& url) const;
 
   std::unique_ptr<Client> client_;
   std::unique_ptr<Bundle> bundle_;
   std::unique_ptr<AdsServe> ads_serve_;
   std::unique_ptr<FrequencyCapping> frequency_capping_;
   std::unique_ptr<Notifications> notifications_;
+  std::unique_ptr<AdConversionTracking> ad_conversions_;
   std::unique_ptr<usermodel::UserModel> user_model_;
 
  private:

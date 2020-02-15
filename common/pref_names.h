@@ -41,6 +41,7 @@ extern const char kHTTPSEVerywhereControlType[];
 extern const char kNoScriptControlType[];
 extern const char kShieldsAdvancedViewEnabled[];
 extern const char kAdControlType[];
+extern const char kGoogleLoginControlType[];
 extern const char kFBEmbedControlType[];
 extern const char kTwitterEmbedControlType[];
 extern const char kLinkedInEmbedControlType[];
@@ -58,8 +59,14 @@ extern const char kNewTabPageShowRewards[];
 extern const char kBraveEnabledMediaRouter[];
 extern const char kBraveWalletAES256GCMSivNonce[];
 extern const char kBraveWalletEncryptedSeed[];
-extern const char kBraveWalletEnabled[];
+// Deprecated in favor of kBraveWalletWeb3Provider
+extern const char kBraveWalletEnabledDeprecated[];
+extern const char kBraveWalletPrefVersion[];
+extern const char kBraveWalletWeb3Provider[];
 extern const char kAlwaysShowBookmarkBarOnNTP[];
+extern const char kRemoteDebuggingEnabled[];
+extern const char kAutocompleteEnabled[];
+extern const char kBraveDarkMode[];
 extern const char kMRUCyclingEnabled[];
 
 #if defined(OS_ANDROID)

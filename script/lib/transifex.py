@@ -101,7 +101,7 @@ def get_transifex_languages(grd_file_path):
 def get_transifex_translation_file_content(source_file_path, filename,
                                            lang_code):
     """Obtains a translation Android xml format and returns the string"""
-    lang_code = lang_code.replace('-', '_')
+    lang_code = lang_code.replace('-', '_').replace('iw', 'he')
     url_part = 'project/%s/resource/%s/translation/%s?mode=default' % (
         transifex_project_name,
         transifex_name_from_filename(source_file_path, filename), lang_code)
@@ -125,12 +125,12 @@ def get_transifex_translation_file_content(source_file_path, filename,
 
 
 def trim_ph_tags_in_xtb_file_content(xml_content):
-    """Removes all children of <ph> tags including $X text inside ph tag"""
+    """Removes all children of <ph> tags including $X and %X text inside ph tag"""
     xml = lxml.etree.fromstring(xml_content)
     phs = xml.findall('.//ph')
     for ph in phs:
         lxml.etree.strip_elements(ph, '*', with_tail=False)
-        if ph.text is not None and ph.text.startswith('$'):
+        if ph.text is not None and (ph.text.startswith('$') or ph.text.startswith('%')):
             ph.text = ''
     return lxml.etree.tostring(xml)
 
@@ -229,10 +229,7 @@ def get_grd_message_string_tags(grd_file_path):
     for element in elements:
         grd_base_path = os.path.dirname(grd_file_path)
         grd_part_filename = element.get('file')
-        if grd_part_filename in ['chromeos_strings.grdp',
-                                 'media_router_resources.grdp',
-                                 'os_settings_strings.grdp',
-                                 'xr_consent_ui_strings.grdp']:
+        if grd_part_filename in ['chromeos_strings.grdp']:
             continue
         grd_part_path = os.path.join(grd_base_path, grd_part_filename)
         part_output_elements = get_grd_message_string_tags(grd_part_path)
@@ -265,6 +262,30 @@ def get_fingerprint_for_xtb(message_tag):
     return str(fp & 0x7fffffffffffffffL)
 
 
+def is_translateable_string(grd_file_path, message_tag):
+    if message_tag.get('translateable') != 'false':
+        return True
+    # Check for exceptions that aren't translateable in Chromium, but are made
+    # to be translateable in Brave. These can be found in the main function in
+    # brave/script/chromium-rebase-l10n.py
+    grd_file_name = os.path.basename(grd_file_path)
+    if grd_file_name == 'chromium_strings.grd':
+        exceptions = {'IDS_SXS_SHORTCUT_NAME',
+                      'IDS_SHORTCUT_NAME_BETA',
+                      'IDS_SHORTCUT_NAME_DEV',
+                      'IDS_APP_SHORTCUTS_SUBDIR_NAME_BETA',
+                      'IDS_APP_SHORTCUTS_SUBDIR_NAME_DEV',
+                      'IDS_INBOUND_MDNS_RULE_NAME_BETA',
+                      'IDS_INBOUND_MDNS_RULE_NAME_CANARY',
+                      'IDS_INBOUND_MDNS_RULE_NAME_DEV',
+                      'IDS_INBOUND_MDNS_RULE_DESCRIPTION_BETA',
+                      'IDS_INBOUND_MDNS_RULE_DESCRIPTION_CANARY',
+                      'IDS_INBOUND_MDNS_RULE_DESCRIPTION_DEV'}
+        if message_tag.get('name') in exceptions:
+            return True
+    return False
+
+
 def get_grd_strings(grd_file_path):
     """Obtains a tubple of (name, value, FP) for each string in a GRD file"""
     strings = []
@@ -272,6 +293,9 @@ def get_grd_strings(grd_file_path):
     dupe_dict = defaultdict(int)
     all_message_tags = get_grd_message_string_tags(grd_file_path)
     for message_tag in all_message_tags:
+        # Skip translateable="false" strings
+        if not is_translateable_string(grd_file_path, message_tag):
+            continue
         message_name = message_tag.get('name')
         dupe_dict[message_name] += 1
 
@@ -285,8 +309,9 @@ def get_grd_strings(grd_file_path):
         message_desc = message_tag.get('desc') or ''
         message_value = textify(message_tag)
         assert not not message_name, 'Message name is empty'
-        assert message_name.startswith('IDS_'), (
-            'Invalid message ID: %s' % message_name)
+        assert (message_name.startswith('IDS_') or
+                message_name.startswith('PRINT_PREVIEW_MEDIA_')), (
+                    'Invalid message ID: %s' % message_name)
         string_name = message_name[4:].lower()
         string_fp = get_fingerprint_for_xtb(message_tag)
         string_tuple = (string_name, message_value, string_fp, message_desc)
@@ -364,6 +389,7 @@ def get_xtb_files(grd_file_path):
 
 def get_original_grd(src_root, grd_file_path):
     """Obtains the Chromium GRD file for a specified Brave GRD file."""
+    # TODO: consider passing this mapping into the script from l10nUtil.js
     grd_file_name = os.path.basename(grd_file_path)
     if grd_file_name == 'components_brave_strings.grd':
         return os.path.join(src_root, 'components',
@@ -373,6 +399,9 @@ def get_original_grd(src_root, grd_file_path):
     elif grd_file_name == 'generated_resources.grd':
         return os.path.join(src_root, 'chrome', 'app',
                             'generated_resources.grd')
+    elif grd_file_name == 'android_chrome_strings.grd':
+        return os.path.join(src_root, 'chrome', 'browser', 'ui', 'android',
+                            'strings', 'android_chrome_strings.grd')
 
 
 def check_for_chromium_upgrade_extra_langs(src_root, grd_file_path):
@@ -492,7 +521,7 @@ def upload_missing_translations_to_transifex(source_string_path, lang_code,
                                              chromium_grd_strings, xtb_strings,
                                              chromium_xtb_strings):
     """For each chromium translation that we don't know about, upload it."""
-    lang_code = lang_code.replace('-', '_')
+    lang_code = lang_code.replace('-', '_').replace('iw', 'he')
     for idx, (string_name, string_value,
               string_fp, desc) in enumerate(grd_strings):
         string_fp = str(string_fp)

@@ -24,6 +24,7 @@ const char kNotificationsStateName[] = "notifications.json";
 const char kNotificationsListKey[] = "notifications";
 
 const char kNotificationIdKey[] = "id";
+const char kNotificationParentIdKey[] = "parent_id";
 const char kNotificationCreativeSetIdKey[] = "creative_set_id";
 const char kNotificationCategoryKey[] = "category";
 const char kNotificationAdvertiserKey[] = "advertiser";
@@ -162,6 +163,11 @@ bool Notifications::GetNotificationFromDictionary(
     return false;
   }
 
+  if (!GetParentIdFromDictionary(dictionary, &notification_info.parent_id)) {
+    // Migrate for legacy notifications
+    notification_info.parent_id = "";
+  }
+
   if (!GetCreativeSetIdFromDictionary(dictionary,
       &notification_info.creative_set_id)) {
     return false;
@@ -196,6 +202,12 @@ bool Notifications::GetIdFromDictionary(
     base::DictionaryValue* dictionary,
     std::string* value) const {
   return GetStringFromDictionary(kNotificationIdKey, dictionary, value);
+}
+
+bool Notifications::GetParentIdFromDictionary(
+    base::DictionaryValue* dictionary,
+    std::string* value) const {
+  return GetStringFromDictionary(kNotificationParentIdKey, dictionary, value);
 }
 
 bool Notifications::GetCreativeSetIdFromDictionary(
@@ -290,6 +302,7 @@ void Notifications::OnStateLoaded(
         << "Failed to load notifications state, resetting to default values";
 
     notifications_.clear();
+    SaveState();
   } else {
     if (!FromJson(json)) {
       BLOG(ERROR) << "Failed to parse notifications state: " << json;
@@ -366,6 +379,8 @@ base::Value Notifications::GetAsList() {
 
     dictionary.SetKey(kNotificationIdKey,
         base::Value(notification.id));
+    dictionary.SetKey(kNotificationParentIdKey,
+        base::Value(notification.parent_id));
     dictionary.SetKey(kNotificationCreativeSetIdKey,
         base::Value(notification.creative_set_id));
     dictionary.SetKey(kNotificationCategoryKey,

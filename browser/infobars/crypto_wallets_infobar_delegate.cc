@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "brave/browser/ui/brave_pages.h"
+#include "brave/common/brave_wallet_constants.h"
 #include "brave/common/extensions/extension_constants.h"
 #include "brave/common/pref_names.h"
 #include "brave/common/url_constants.h"
@@ -40,7 +41,7 @@ CryptoWalletsInfoBarDelegate::~CryptoWalletsInfoBarDelegate() {}
 
 infobars::InfoBarDelegate::InfoBarIdentifier
 CryptoWalletsInfoBarDelegate::GetIdentifier() const {
-  return (InfoBarIdentifier)CRYPTO_WALLETS_INFOBAR_DELEGATE;
+  return CRYPTO_WALLETS_INFOBAR_DELEGATE;
 }
 
 const gfx::VectorIcon& CryptoWalletsInfoBarDelegate::GetVectorIcon() const {
@@ -89,6 +90,10 @@ bool CryptoWalletsInfoBarDelegate::Accept() {
     content::WebContents* web_contents =
       InfoBarService::WebContentsFromInfoBar(infobar());
     if (web_contents) {
+      auto* browser_context = web_contents->GetBrowserContext();
+      user_prefs::UserPrefs::Get(browser_context)->
+          SetInteger(kBraveWalletWeb3Provider,
+              static_cast<int>(BraveWalletWeb3ProviderTypes::CRYPTO_WALLETS));
       Browser* browser = chrome::FindBrowserWithWebContents(web_contents);
       brave::ShowBraveWallet(browser);
     }
@@ -101,7 +106,8 @@ bool CryptoWalletsInfoBarDelegate::Cancel() {
       InfoBarService::WebContentsFromInfoBar(infobar());
   if (web_contents) {
     user_prefs::UserPrefs::Get(web_contents->GetBrowserContext())->
-        SetBoolean(kBraveWalletEnabled, false);
+        SetInteger(kBraveWalletWeb3Provider,
+            static_cast<int>(BraveWalletWeb3ProviderTypes::METAMASK));
   }
   return true;
 }

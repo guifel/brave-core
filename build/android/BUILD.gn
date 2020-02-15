@@ -1,22 +1,48 @@
 import("//brave/build/config.gni")
 import("//build/config/android/rules.gni")
 
+action("sign_app") {
+  script = "//brave/build/android/sign_apk.py"
+  _apksigner = "$android_sdk_build_tools/apksigner"
+  _zipalign = "$android_sdk_build_tools/zipalign"
+
+  deps = []
+  target_sign_app_path = ""
+  if (target_apk_base == "modern") {
+    assert(target_cpu != "arm64" && target_cpu != "x64")
+    target_sign_app_path = "$root_out_dir/apks/ChromeModernPublic.apk"
+  } else if (target_cpu == "arm64" || target_cpu == "x64" ||
+      target_apk_base == "mono") {
+    target_sign_app_path = "$root_out_dir/apks/MonochromePublic.apk"
+  } else {
+    target_sign_app_path = "$root_out_dir/apks/ChromePublic.apk"
+  }
+
+  outputs = [ "$target_sign_app_path-singed" ]
+  args = [
+    rebase_path(_zipalign, root_out_dir),
+    rebase_path(_apksigner, root_out_dir),
+    rebase_path(target_sign_app_path, root_out_dir),
+    rebase_path("$brave_android_keystore_path", root_out_dir),
+    "$brave_android_keystore_password",
+    "$brave_android_key_password",
+    "$brave_android_keystore_name"
+  ]
+}
+
 copy("brave") {
   visibility = [ "*" ]
   deps = []
   sources = []
-  file_name_part = ""
   if (target_apk_base == "modern") {
     assert(target_cpu != "arm64" && target_cpu != "x64")
     deps += ["//chrome/android:chrome_modern_public_apk"]
-    file_name_part = "Modern"
     sources += [
       "$root_out_dir/apks/ChromeModernPublic.apk"
     ]
   } else if (target_cpu == "arm64" || target_cpu == "x64" ||
       target_apk_base == "mono") {
     deps += ["//chrome/android:monochrome_public_apk"]
-    file_name_part = "Mono"
     sources += [
       "$root_out_dir/apks/MonochromePublic.apk"
     ]
@@ -27,12 +53,12 @@ copy("brave") {
     ]
   }
   outputs = [
-    "$root_out_dir/apks/Brave$file_name_part$target_cpu.apk",
+    brave_apk_output
   ]
 }
 
 java_strings_grd("android_brave_strings_grd") {
-  grd_file = "//brave/android/java/strings/android_brave_strings.grd"
+  grd_file = "//brave/browser/ui/android/strings/android_brave_strings.grd"
   outputs = [
     "values/android_brave_strings.xml",
     "values-am/android_brave_strings.xml",
@@ -95,6 +121,9 @@ generate_jni("jni_headers") {
     "//brave/android/java/org/chromium/chrome/browser/BraveActivity.java",
     "//brave/android/java/org/chromium/chrome/browser/BraveRelaunchUtils.java",
     "//brave/android/java/org/chromium/chrome/browser/BraveRewardsNativeWorker.java",
+    "//brave/android/java/org/chromium/chrome/browser/BraveSyncWorker.java",
+    "//brave/android/java/org/chromium/chrome/browser/notifications/BraveNotificationPlatformBridge.java",
+    "//brave/android/java/org/chromium/chrome/browser/notifications/BraveNotificationSettingsBridge.java",
     "//brave/android/java/org/chromium/chrome/browser/preferences/BravePrefServiceBridge.java",
     "//brave/android/java/org/chromium/chrome/browser/preferences/website/BraveShieldsContentSettings.java",
     "//brave/android/java/org/chromium/chrome/browser/signin/BraveSigninManager.java",

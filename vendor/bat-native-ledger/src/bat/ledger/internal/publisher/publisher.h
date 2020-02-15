@@ -12,7 +12,8 @@
 #include <vector>
 
 #include "base/gtest_prod_util.h"
-#include "bat/ledger/internal/bat_helper.h"
+#include "bat/ledger/internal/properties/publisher_properties.h"
+#include "bat/ledger/internal/properties/publisher_settings_properties.h"
 #include "bat/ledger/ledger.h"
 #include "bat/ledger/ledger_callback_handler.h"
 
@@ -20,8 +21,8 @@ namespace bat_ledger {
 class LedgerImpl;
 }
 
-namespace braveledger_bat_helper {
-struct PUBLISHER_STATE_ST;
+namespace ledger {
+struct PublisherSettings;
 }
 
 namespace braveledger_publisher {
@@ -73,8 +74,8 @@ class Publisher : public ledger::LedgerCallbackHandler {
                         const ledger::BalanceReportInfo& report_info);
 
   void GetBalanceReport(
-      ledger::ActivityMonth month,
-      int year,
+      const ledger::ActivityMonth month,
+      const int year,
       ledger::GetBalanceReportCallback callback);
 
   std::map<std::string, ledger::BalanceReportInfoPtr> GetAllBalanceReports();
@@ -105,10 +106,11 @@ class Publisher : public ledger::LedgerCallbackHandler {
   void GetPublisherBanner(const std::string& publisher_key,
                           ledger::PublisherBannerCallback callback);
 
-  void setBalanceReportItem(ledger::ActivityMonth month,
-                            int year,
-                            ledger::ReportType type,
-                            const std::string& probi);
+  void SetBalanceReportItem(
+      const ledger::ActivityMonth month,
+      const int year,
+      const ledger::ReportType type,
+      const double amount);
 
   ledger::ActivityInfoFilterPtr CreateActivityFilter(
       const std::string& publisher_id,
@@ -176,9 +178,9 @@ class Publisher : public ledger::LedgerCallbackHandler {
     uint64_t window_id,
     const ledger::PublisherInfoCallback callback);
 
-  bool GetBalanceReportInternal(
-      ledger::ActivityMonth month,
-      int year,
+  ledger::Result GetBalanceReportInternal(
+      const ledger::ActivityMonth month,
+      const int year,
       ledger::BalanceReportInfo* report_info);
 
   void onFetchFavIcon(const std::string& publisher_key,
@@ -217,7 +219,7 @@ class Publisher : public ledger::LedgerCallbackHandler {
   void SetMigrateScore(bool value);
 
   bool isPublisherVisible(
-      const braveledger_bat_helper::PUBLISHER_ST& publisher_st);
+      const ledger::PublisherProperties& publisher_st);
 
   void OnSaveVisitInternal(
     ledger::Result result,
@@ -243,7 +245,7 @@ class Publisher : public ledger::LedgerCallbackHandler {
   ledger::PublisherStatus ParsePublisherStatus(const std::string& status);
 
   bat_ledger::LedgerImpl* ledger_;  // NOT OWNED
-  std::unique_ptr<braveledger_bat_helper::PUBLISHER_STATE_ST> state_;
+  std::unique_ptr<ledger::PublisherSettingsProperties> state_;
   std::unique_ptr<PublisherServerList> server_list_;
 
   double a_;

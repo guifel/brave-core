@@ -40,7 +40,6 @@ export const defaultState: Rewards.State = {
     onBoardingDisplayed: false
   },
   autoContributeList: [],
-  reports: {},
   safetyNetFailed: false,
   recurringList: [],
   tipsList: [],
@@ -49,6 +48,7 @@ export const defaultState: Rewards.State = {
   tipsLoad: false,
   adsData: {
     adsEnabled: false,
+    shouldAllowAdConversionTracking: false,
     adsPerHour: 0,
     adsUIEnabled: false,
     adsIsSupported: false,
@@ -58,8 +58,7 @@ export const defaultState: Rewards.State = {
   },
   adsHistory: [],
   pendingContributionTotal: 0,
-  grants: [],
-  currentGrant: undefined,
+  promotions: [],
   inlineTip: {
     twitter: true,
     reddit: true,
@@ -71,6 +70,10 @@ export const defaultState: Rewards.State = {
     total: 0,
     rates: {},
     wallets: {}
+  },
+  monthlyReport: {
+    month: -1,
+    year: -1
   }
 }
 

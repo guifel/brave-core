@@ -1,5 +1,5 @@
 diff --git a/chrome/installer/mac/BUILD.gn b/chrome/installer/mac/BUILD.gn
-index 1425094d2cb2605fbc9ce11d68276471322d5640..23029d1e900dee50cc55fc7de4ac6235a50e3098 100644
+index ef35915f961cac3a038b0fab8c3ff4e8d7269ad9..f2c54c1967514b70bd4b63bee690a67b15254d5f 100644
 --- a/chrome/installer/mac/BUILD.gn
 +++ b/chrome/installer/mac/BUILD.gn
 @@ -15,7 +15,7 @@ group("mac") {
