@@ -9,8 +9,8 @@
 #include "ui/events/event_handler.h"
 #include "chrome/browser/profiles/profile.h" // Needed for getting perf
 #include "components/prefs/pref_service.h" // Needed for getting perf
+#include "content/public/browser/web_contents.h" // Needed for getting pref
 #include "brave/common/pref_names.h" // Same
-
 
 #if defined(USE_AURA)
 #include "ui/aura/window.h"
